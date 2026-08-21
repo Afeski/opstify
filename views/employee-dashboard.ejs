@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>My Requests - PeopleOps Tool</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>My Requests</h1>
+  <p>Logged in as <strong><%= name %></strong></p>
+
+  <p><a href="/requests/new">Submit a new request</a></p>
+
+  <% if (requests.length === 0) { %>
+    <p>You haven't submitted any requests yet.</p>
+  <% } else { %>
+    <table>
+      <thead>
+        <tr>
+          <th>Type</th>
+          <th>Description</th>
+          <th>Status</th>
+          <th>Submitted</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% requests.forEach(function(r) { %>
+          <tr>
+            <td><%= r.type %></td>
+            <td><%= r.description %></td>
+            <td><%= r.status %></td>
+            <td><%= r.created_at %></td>
+          </tr>
+        <% }); %>
+      </tbody>
+    </table>
+  <% } %>
+</body>
+</html>

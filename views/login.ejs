@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>PeopleOps Tool - Sign In</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <h1>PeopleOps Request Tool</h1>
+
+  <form method="POST" action="/login">
+    <label>
+      Your name
+      <input type="text" name="name" required>
+    </label>
+
+    <fieldset>
+      <legend>Role</legend>
+      <label>
+        <input type="radio" name="role" value="employee" checked>
+        Employee
+      </label>
+      <label>
+        <input type="radio" name="role" value="admin">
+        PeopleOps admin
+      </label>
+    </fieldset>
+
+    <button type="submit">Continue</button>
+  </form>
+</body>
+</html>

@@ -1,0 +1,11 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head', { title }) %>
+<body class="auth-body">
+  <div class="auth-card">
+    <p class="error-code"><%= status %></p>
+    <h1><%= message %></h1>
+    <p><a href="/dashboard">Go back</a></p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <%- include('partials/flash', { flash }) %>
+    <p><a href="/dashboard">&larr; Back to dashboard</a></p>
+
+    <div class="page-header">
+      <div>
+        <h1>Request #<%= request.id %></h1>
+        <p class="muted"><%= request.type.replace('_', ' ') %> &middot; submitted by <%= request.requester_name %></p>
+      </div>
+      <span class="badge badge-<%= request.status %>"><%= STATUS_LABELS[request.status] %></span>
+    </div>
+
+    <div class="card">
+      <h2>Description</h2>
+      <p class="preserve-whitespace"><%= request.description %></p>
+
+      <h2>Admin notes</h2>
+      <p class="preserve-whitespace muted"><%= request.admin_notes || 'No notes yet.' %></p>
+
+      <p class="muted">Submitted <%= request.created_at %> &middot; Last updated <%= request.updated_at %></p>
+    </div>
+
+    <% if (role === 'admin') { %>
+      <div class="card">
+        <h2>Update status</h2>
+        <form method="POST" action="/requests/<%= request.id %>/status">
+          <input type="hidden" name="next" value="/requests/<%= request.id %>">
+          <label>
+            Status
+            <select name="status">
+              <option value="open" <%= request.status === 'open' ? 'selected' : '' %>>Open</option>
+              <option value="in_progress" <%= request.status === 'in_progress' ? 'selected' : '' %>>In progress</option>
+              <option value="resolved" <%= request.status === 'resolved' ? 'selected' : '' %>>Resolved</option>
+            </select>
+          </label>
+          <label>
+            Internal notes
+            <textarea name="admin_notes" rows="4"><%= request.admin_notes || '' %></textarea>
+          </label>
+          <button type="submit">Update</button>
+        </form>
+      </div>
+    <% } %>
+  </main>
+  </div>
+</body>
+</html>

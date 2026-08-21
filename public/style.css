@@ -68,20 +68,27 @@ a:hover {
   text-decoration: underline;
 }
 
-/* ---------- app shell: top nav + centered page column ---------- */
+/* ---------- app shell: left sidebar + content column ---------- */
 
-.nav {
-  background: var(--color-bg);
-  border-bottom: 1px solid var(--color-border);
+.app-shell {
+  display: flex;
+  align-items: stretch;
+  min-height: 100vh;
 }
 
-.nav-inner {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: var(--space-1) var(--space-2);
+.sidebar {
+  width: 220px;
+  flex-shrink: 0;
+  background: var(--color-bg);
+  border-right: 1px solid var(--color-border);
   display: flex;
-  align-items: center;
-  justify-content: space-between;
+  flex-direction: column;
+  padding: var(--space-2);
+}
+
+.sidebar-brand {
+  padding: var(--space-1);
+  margin-bottom: var(--space-2);
 }
 
 .brand {
@@ -94,10 +101,40 @@ a:hover {
   text-decoration: none;
 }
 
-.nav-user {
+.sidebar-nav {
   display: flex;
-  align-items: center;
-  gap: var(--space-1);
+  flex-direction: column;
+  gap: 0.15rem;
+  flex: 1;
+}
+
+.sidebar-link {
+  display: block;
+  padding: 0.5rem var(--space-1);
+  border-radius: var(--radius);
+  color: var(--color-text);
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.sidebar-link:hover {
+  background: var(--color-surface);
+  text-decoration: none;
+}
+
+.sidebar-link.active {
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+  font-weight: 600;
+}
+
+.sidebar-user {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-2) var(--space-1) 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.3rem;
   font-size: 0.85rem;
 }
 
@@ -118,9 +155,52 @@ a:hover {
 }
 
 .page {
-  max-width: 900px;
-  margin: 0 auto;
-  padding: var(--space-3) var(--space-2) var(--space-4);
+  flex: 1;
+  min-width: 0;
+  max-width: 1000px;
+  padding: var(--space-3);
+}
+
+/* below this width, the sidebar collapses into a horizontal top bar
+   instead of a JS-driven collapsible drawer — this is an internal,
+   desktop-first tool, so a simple CSS-only fallback is enough */
+@media (max-width: 640px) {
+  .app-shell {
+    flex-direction: column;
+    min-height: 0;
+  }
+
+  .sidebar {
+    width: 100%;
+    flex-direction: row;
+    align-items: center;
+    border-right: none;
+    border-bottom: 1px solid var(--color-border);
+    padding: var(--space-1) var(--space-2);
+  }
+
+  .sidebar-brand {
+    margin-bottom: 0;
+    margin-right: var(--space-2);
+    padding: 0;
+  }
+
+  .sidebar-nav {
+    flex-direction: row;
+    flex: 1;
+  }
+
+  .sidebar-user {
+    border-top: none;
+    flex-direction: row;
+    align-items: center;
+    padding: 0;
+    margin-left: auto;
+  }
+
+  .page {
+    padding: var(--space-2);
+  }
 }
 
 .page-header {
@@ -161,6 +241,86 @@ a:hover {
   align-items: center;
   gap: 0.4rem;
   color: var(--color-text);
+}
+
+.card + .card {
+  margin-top: var(--space-2);
+}
+
+.card h2 {
+  font-size: 0.95rem;
+  margin: 0 0 0.4rem;
+}
+
+.card h2:not(:first-child) {
+  margin-top: var(--space-2);
+}
+
+.preserve-whitespace {
+  white-space: pre-wrap;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.stat-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--color-brand);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-2);
+}
+
+.stat-card--open {
+  border-top-color: var(--color-status-open);
+}
+
+.stat-card--progress {
+  border-top-color: var(--color-status-progress);
+}
+
+.stat-card--resolved {
+  border-top-color: var(--color-status-resolved);
+}
+
+.stat-value {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin: 0;
+  line-height: 1.2;
+}
+
+.stat-label {
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0.15rem 0 0;
+}
+
+.flash {
+  background: var(--color-status-resolved-bg);
+  color: var(--color-status-resolved);
+  border: 1px solid var(--color-status-resolved);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.error-code {
+  color: var(--color-text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+  margin: 0 0 0.25rem;
 }
 
 /* ---------- generic surfaces ---------- */

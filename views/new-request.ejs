@@ -2,30 +2,32 @@
 <html>
 <%- include('partials/head') %>
 <body>
-  <%- include('partials/nav') %>
-  <main class="page">
-    <h1>New Request</h1>
-    <p class="muted">Submitting as <strong><%= name %></strong></p>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+    <main class="page">
+      <h1>New Request</h1>
+      <p class="muted">Submitting as <strong><%= name %></strong></p>
 
-    <form method="POST" action="/requests" class="card">
-      <label>
-        Type
-        <select name="type" required>
-          <option value="pto">PTO</option>
-          <option value="equipment">Equipment</option>
-          <option value="onboarding">Onboarding</option>
-          <option value="policy_question">Policy question</option>
-          <option value="other">Other</option>
-        </select>
-      </label>
+      <form method="POST" action="/requests" class="card">
+        <label>
+          Type
+          <select name="type" required>
+            <option value="pto">PTO</option>
+            <option value="equipment">Equipment</option>
+            <option value="onboarding">Onboarding</option>
+            <option value="policy_question">Policy question</option>
+            <option value="other">Other</option>
+          </select>
+        </label>
 
-      <label>
-        Description
-        <textarea name="description" required rows="4"></textarea>
-      </label>
+        <label>
+          Description
+          <textarea name="description" required rows="4"></textarea>
+        </label>
 
-      <button type="submit">Submit request</button>
-    </form>
-  </main>
+        <button type="submit">Submit request</button>
+      </form>
+    </main>
+  </div>
 </body>
 </html>

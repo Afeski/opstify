@@ -2,14 +2,18 @@
 <html>
 <%- include('partials/head') %>
 <body>
-  <%- include('partials/nav') %>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
   <main class="page">
+    <%- include('partials/flash', { flash }) %>
     <div class="page-header">
       <div>
         <h1>All Requests</h1>
         <p class="muted">Every request across the org, oldest open first</p>
       </div>
     </div>
+
+    <%- include('partials/stats', { stats }) %>
 
     <% if (requests.length === 0) { %>
       <div class="empty-state">
@@ -25,6 +29,7 @@
               <th>Description</th>
               <th>Submitted</th>
               <th>Status &amp; notes</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -46,6 +51,7 @@
                     <button type="submit">Update</button>
                   </form>
                 </td>
+                <td><a href="/requests/<%= r.id %>">View</a></td>
               </tr>
             <% }); %>
           </tbody>
@@ -53,5 +59,6 @@
       </div>
     <% } %>
   </main>
+  </div>
 </body>
 </html>

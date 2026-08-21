@@ -6,6 +6,19 @@ const VALID_TYPES = ['pto', 'equipment', 'onboarding', 'policy_question', 'other
 const VALID_STATUSES = ['open', 'in_progress', 'resolved'];
 const STATUS_LABELS = { open: 'Open', in_progress: 'In progress', resolved: 'Resolved' };
 
+function renderError(res, status, message) {
+  res.status(status).render('error', { title: `${status} Error`, status, message });
+}
+
+function computeStats(statusCounts) {
+  const stats = { open: 0, in_progress: 0, resolved: 0, total: 0 };
+  for (const row of statusCounts) {
+    stats[row.status] = row.count;
+    stats.total += row.count;
+  }
+  return stats;
+}
+
 const app = express();
 
 app.set('view engine', 'ejs');
@@ -20,6 +33,11 @@ app.use(session({
   saveUninitialized: false,
 }));
 
+app.use((req, res, next) => {
+  res.locals.currentPath = req.path;
+  next();
+});
+
 app.get('/', (req, res) => {
   res.render('login', { title: 'Sign In' });
 });
@@ -28,7 +46,7 @@ app.post('/login', (req, res) => {
   const { name, role } = req.body;
 
   if (!name || !name.trim() || !['employee', 'admin'].includes(role)) {
-    return res.status(400).send('Name and a valid role are required.');
+    return renderError(res, 400, 'Name and a valid role are required.');
   }
 
   req.session.name = name.trim();
@@ -42,7 +60,7 @@ function requireEmployee(req, res, next) {
     return res.redirect('/');
   }
   if (req.session.role !== 'employee') {
-    return res.status(403).send('Only employees can submit requests.');
+    return renderError(res, 403, 'Only employees can submit requests.');
   }
   next();
 }
@@ -55,14 +73,14 @@ app.post('/requests', requireEmployee, (req, res) => {
   const { type, description } = req.body;
 
   if (!VALID_TYPES.includes(type) || !description || !description.trim()) {
-    return res.status(400).send('A valid type and non-empty description are required.');
+    return renderError(res, 400, 'A valid type and non-empty description are required.');
   }
 
   db.prepare(
     'INSERT INTO requests (requester_name, type, description) VALUES (?, ?, ?)'
   ).run(req.session.name, type, description.trim());
 
-  res.redirect('/dashboard');
+  res.redirect('/dashboard?flash=' + encodeURIComponent('Request submitted.'));
 });
 
 app.get('/dashboard', (req, res) => {
@@ -70,9 +88,14 @@ app.get('/dashboard', (req, res) => {
     return res.redirect('/');
   }
 
+  const flash = req.query.flash || null;
+
   if (req.session.role === 'employee') {
     const requests = db
       .prepare('SELECT * FROM requests WHERE requester_name = ? ORDER BY created_at DESC')
+      .all(req.session.name);
+    const statusCounts = db
+      .prepare('SELECT status, COUNT(*) as count FROM requests WHERE requester_name = ? GROUP BY status')
       .all(req.session.name);
     return res.render('employee-dashboard', {
       title: 'My Requests',
@@ -80,6 +103,8 @@ app.get('/dashboard', (req, res) => {
       role: req.session.role,
       requests,
       STATUS_LABELS,
+      stats: computeStats(statusCounts),
+      flash,
     });
   }
 
@@ -91,12 +116,37 @@ app.get('/dashboard', (req, res) => {
         created_at ASC
     `)
     .all();
+  const statusCounts = db.prepare('SELECT status, COUNT(*) as count FROM requests GROUP BY status').all();
   res.render('admin-dashboard', {
     title: 'All Requests',
     name: req.session.name,
     role: req.session.role,
     requests,
     STATUS_LABELS,
+    stats: computeStats(statusCounts),
+    flash,
+  });
+});
+
+app.get('/requests/:id', (req, res) => {
+  if (!req.session.name) {
+    return res.redirect('/');
+  }
+
+  const request = db.prepare('SELECT * FROM requests WHERE id = ?').get(req.params.id);
+  const canView = request && (req.session.role === 'admin' || request.requester_name === req.session.name);
+
+  if (!canView) {
+    return renderError(res, 404, 'Request not found.');
+  }
+
+  res.render('request-detail', {
+    title: `Request #${request.id}`,
+    name: req.session.name,
+    role: req.session.role,
+    request,
+    STATUS_LABELS,
+    flash: req.query.flash || null,
   });
 });
 
@@ -111,7 +161,7 @@ function requireAdmin(req, res, next) {
     return res.redirect('/');
   }
   if (req.session.role !== 'admin') {
-    return res.status(403).send('Admins only.');
+    return renderError(res, 403, 'Admins only.');
   }
   next();
 }
@@ -120,7 +170,7 @@ app.post('/requests/:id/status', requireAdmin, (req, res) => {
   const { status, admin_notes } = req.body;
 
   if (!VALID_STATUSES.includes(status)) {
-    return res.status(400).send('Invalid status.');
+    return renderError(res, 400, 'Invalid status.');
   }
 
   const result = db
@@ -128,10 +178,15 @@ app.post('/requests/:id/status', requireAdmin, (req, res) => {
     .run(status, admin_notes ? admin_notes.trim() : null, req.params.id);
 
   if (result.changes === 0) {
-    return res.status(404).send('Request not found.');
+    return renderError(res, 404, 'Request not found.');
   }
 
-  res.redirect('/dashboard');
+  // whitelist the redirect target so a submitted "next" value can only ever
+  // send the admin back to the dashboard or to this same request's detail page
+  const detailPath = `/requests/${req.params.id}`;
+  const next = req.body.next === detailPath ? detailPath : '/dashboard';
+
+  res.redirect(`${next}?flash=${encodeURIComponent('Status updated.')}`);
 });
 
 const PORT = 3000;

@@ -2,8 +2,10 @@
 <html>
 <%- include('partials/head') %>
 <body>
-  <%- include('partials/nav') %>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
   <main class="page">
+    <%- include('partials/flash', { flash }) %>
     <div class="page-header">
       <div>
         <h1>My Requests</h1>
@@ -11,6 +13,8 @@
       </div>
       <a href="/requests/new" class="button-link">+ New request</a>
     </div>
+
+    <%- include('partials/stats', { stats }) %>
 
     <% if (requests.length === 0) { %>
       <div class="empty-state">
@@ -26,6 +30,7 @@
               <th>Description</th>
               <th>Status</th>
               <th>Submitted</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -35,6 +40,7 @@
                 <td><%= r.description %></td>
                 <td><span class="badge badge-<%= r.status %>"><%= STATUS_LABELS[r.status] %></span></td>
                 <td class="muted"><%= r.created_at %></td>
+                <td><a href="/requests/<%= r.id %>">View</a></td>
               </tr>
             <% }); %>
           </tbody>
@@ -42,5 +48,6 @@
       </div>
     <% } %>
   </main>
+  </div>
 </body>
 </html>

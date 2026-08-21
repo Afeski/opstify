@@ -1,38 +1,46 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>My Requests - PeopleOps Tool</title>
-  <link rel="stylesheet" href="/style.css">
-</head>
+<%- include('partials/head') %>
 <body>
-  <h1>My Requests</h1>
-  <p>Logged in as <strong><%= name %></strong></p>
+  <%- include('partials/nav') %>
+  <main class="page">
+    <div class="page-header">
+      <div>
+        <h1>My Requests</h1>
+        <p class="muted">Everything you've submitted to PeopleOps</p>
+      </div>
+      <a href="/requests/new" class="button-link">+ New request</a>
+    </div>
 
-  <p><a href="/requests/new">Submit a new request</a></p>
-
-  <% if (requests.length === 0) { %>
-    <p>You haven't submitted any requests yet.</p>
-  <% } else { %>
-    <table>
-      <thead>
-        <tr>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Status</th>
-          <th>Submitted</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% requests.forEach(function(r) { %>
-          <tr>
-            <td><%= r.type %></td>
-            <td><%= r.description %></td>
-            <td><%= r.status %></td>
-            <td><%= r.created_at %></td>
-          </tr>
-        <% }); %>
-      </tbody>
-    </table>
-  <% } %>
+    <% if (requests.length === 0) { %>
+      <div class="empty-state">
+        <p>You haven't submitted any requests yet.</p>
+        <a href="/requests/new">Submit your first request</a>
+      </div>
+    <% } else { %>
+      <div class="card table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Status</th>
+              <th>Submitted</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% requests.forEach(function(r) { %>
+              <tr>
+                <td class="type-cell"><%= r.type.replace('_', ' ') %></td>
+                <td><%= r.description %></td>
+                <td><span class="badge badge-<%= r.status %>"><%= STATUS_LABELS[r.status] %></span></td>
+                <td class="muted"><%= r.created_at %></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
 </body>
 </html>

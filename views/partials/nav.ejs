@@ -1,0 +1,10 @@
+<header class="nav">
+  <div class="nav-inner">
+    <a href="/dashboard" class="brand">Opstify</a>
+    <div class="nav-user">
+      <span class="nav-role"><%= role === 'admin' ? 'PeopleOps admin' : 'Employee' %></span>
+      <span class="nav-name"><%= name %></span>
+      <a href="/logout" class="nav-logout">Sign out</a>
+    </div>
+  </div>
+</header>

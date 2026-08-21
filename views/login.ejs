@@ -1,31 +1,31 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>PeopleOps Tool - Sign In</title>
-  <link rel="stylesheet" href="/style.css">
-</head>
-<body>
-  <h1>PeopleOps Request Tool</h1>
+<%- include('partials/head') %>
+<body class="auth-body">
+  <div class="auth-card">
+    <h1>Opstify</h1>
+    <p class="muted">PeopleOps request management</p>
 
-  <form method="POST" action="/login">
-    <label>
-      Your name
-      <input type="text" name="name" required>
-    </label>
-
-    <fieldset>
-      <legend>Role</legend>
+    <form method="POST" action="/login">
       <label>
-        <input type="radio" name="role" value="employee" checked>
-        Employee
+        Your name
+        <input type="text" name="name" required autofocus>
       </label>
-      <label>
-        <input type="radio" name="role" value="admin">
-        PeopleOps admin
-      </label>
-    </fieldset>
 
-    <button type="submit">Continue</button>
-  </form>
+      <fieldset>
+        <legend>Role</legend>
+        <label class="radio-option">
+          <input type="radio" name="role" value="employee" checked>
+          Employee
+        </label>
+        <label class="radio-option">
+          <input type="radio" name="role" value="admin">
+          PeopleOps admin
+        </label>
+      </fieldset>
+
+      <button type="submit">Continue</button>
+    </form>
+  </div>
 </body>
 </html>

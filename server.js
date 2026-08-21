@@ -4,6 +4,7 @@ const db = require('./db/database');
 
 const VALID_TYPES = ['pto', 'equipment', 'onboarding', 'policy_question', 'other'];
 const VALID_STATUSES = ['open', 'in_progress', 'resolved'];
+const STATUS_LABELS = { open: 'Open', in_progress: 'In progress', resolved: 'Resolved' };
 
 const app = express();
 
@@ -20,7 +21,7 @@ app.use(session({
 }));
 
 app.get('/', (req, res) => {
-  res.render('login');
+  res.render('login', { title: 'Sign In' });
 });
 
 app.post('/login', (req, res) => {
@@ -47,7 +48,7 @@ function requireEmployee(req, res, next) {
 }
 
 app.get('/requests/new', requireEmployee, (req, res) => {
-  res.render('new-request', { name: req.session.name });
+  res.render('new-request', { title: 'New Request', name: req.session.name, role: req.session.role });
 });
 
 app.post('/requests', requireEmployee, (req, res) => {
@@ -73,7 +74,13 @@ app.get('/dashboard', (req, res) => {
     const requests = db
       .prepare('SELECT * FROM requests WHERE requester_name = ? ORDER BY created_at DESC')
       .all(req.session.name);
-    return res.render('employee-dashboard', { name: req.session.name, requests });
+    return res.render('employee-dashboard', {
+      title: 'My Requests',
+      name: req.session.name,
+      role: req.session.role,
+      requests,
+      STATUS_LABELS,
+    });
   }
 
   const requests = db
@@ -84,7 +91,19 @@ app.get('/dashboard', (req, res) => {
         created_at ASC
     `)
     .all();
-  res.render('admin-dashboard', { name: req.session.name, requests });
+  res.render('admin-dashboard', {
+    title: 'All Requests',
+    name: req.session.name,
+    role: req.session.role,
+    requests,
+    STATUS_LABELS,
+  });
+});
+
+app.get('/logout', (req, res) => {
+  req.session.destroy(() => {
+    res.redirect('/');
+  });
 });
 
 function requireAdmin(req, res, next) {

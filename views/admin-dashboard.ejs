@@ -1,48 +1,57 @@
 <!DOCTYPE html>
 <html>
-<head>
-  <title>All Requests - PeopleOps Tool</title>
-  <link rel="stylesheet" href="/style.css">
-</head>
+<%- include('partials/head') %>
 <body>
-  <h1>All Requests</h1>
-  <p>Logged in as <strong><%= name %></strong> (admin)</p>
+  <%- include('partials/nav') %>
+  <main class="page">
+    <div class="page-header">
+      <div>
+        <h1>All Requests</h1>
+        <p class="muted">Every request across the org, oldest open first</p>
+      </div>
+    </div>
 
-  <% if (requests.length === 0) { %>
-    <p>No requests have been submitted yet.</p>
-  <% } else { %>
-    <table>
-      <thead>
-        <tr>
-          <th>Requester</th>
-          <th>Type</th>
-          <th>Description</th>
-          <th>Submitted</th>
-          <th>Status &amp; notes</th>
-        </tr>
-      </thead>
-      <tbody>
-        <% requests.forEach(function(r) { %>
-          <tr>
-            <td><%= r.requester_name %></td>
-            <td><%= r.type %></td>
-            <td><%= r.description %></td>
-            <td><%= r.created_at %></td>
-            <td>
-              <form method="POST" action="/requests/<%= r.id %>/status">
-                <select name="status">
-                  <option value="open" <%= r.status === 'open' ? 'selected' : '' %>>Open</option>
-                  <option value="in_progress" <%= r.status === 'in_progress' ? 'selected' : '' %>>In progress</option>
-                  <option value="resolved" <%= r.status === 'resolved' ? 'selected' : '' %>>Resolved</option>
-                </select>
-                <textarea name="admin_notes" rows="2" placeholder="Internal notes"><%= r.admin_notes || '' %></textarea>
-                <button type="submit">Update</button>
-              </form>
-            </td>
-          </tr>
-        <% }); %>
-      </tbody>
-    </table>
-  <% } %>
+    <% if (requests.length === 0) { %>
+      <div class="empty-state">
+        <p>No requests have been submitted yet.</p>
+      </div>
+    <% } else { %>
+      <div class="card table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Requester</th>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Submitted</th>
+              <th>Status &amp; notes</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% requests.forEach(function(r) { %>
+              <tr>
+                <td><%= r.requester_name %></td>
+                <td class="type-cell"><%= r.type.replace('_', ' ') %></td>
+                <td><%= r.description %></td>
+                <td class="muted"><%= r.created_at %></td>
+                <td>
+                  <span class="badge badge-<%= r.status %>"><%= STATUS_LABELS[r.status] %></span>
+                  <form method="POST" action="/requests/<%= r.id %>/status">
+                    <select name="status">
+                      <option value="open" <%= r.status === 'open' ? 'selected' : '' %>>Open</option>
+                      <option value="in_progress" <%= r.status === 'in_progress' ? 'selected' : '' %>>In progress</option>
+                      <option value="resolved" <%= r.status === 'resolved' ? 'selected' : '' %>>Resolved</option>
+                    </select>
+                    <textarea name="admin_notes" rows="2" placeholder="Internal notes"><%= r.admin_notes || '' %></textarea>
+                    <button type="submit">Update</button>
+                  </form>
+                </td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
 </body>
 </html>

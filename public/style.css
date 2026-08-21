@@ -1,30 +1,209 @@
+/*
+  Opstify design tokens.
+  Every color, radius, and spacing value used below traces back to one
+  of these variables — change a value here and it updates everywhere,
+  instead of hunting through every rule that happens to use "#2563eb".
+*/
+:root {
+  --color-brand: #4f46e5;
+  --color-brand-hover: #4338ca;
+  --color-brand-soft: #eef2ff;
+
+  --color-bg: #ffffff;
+  --color-surface: #f8fafc;
+  --color-border: #e2e8f0;
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+
+  /* status colors are deliberately distinct from the brand color above,
+     so "this is an action" (indigo) never gets confused with "this is
+     a state" (amber/blue/green) */
+  --color-status-open: #b45309;
+  --color-status-open-bg: #fef3c7;
+  --color-status-progress: #1d4ed8;
+  --color-status-progress-bg: #dbeafe;
+  --color-status-resolved: #15803d;
+  --color-status-resolved-bg: #dcfce7;
+
+  --radius: 8px;
+  --radius-lg: 12px;
+  --space-1: 0.5rem;
+  --space-2: 1rem;
+  --space-3: 1.5rem;
+  --space-4: 2.5rem;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04);
+  --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
+
+  --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
 body {
-  font-family: system-ui, sans-serif;
-  max-width: 900px;
-  margin: 2rem auto;
-  padding: 0 1rem;
-  color: #222;
+  font-family: var(--font-sans);
+  margin: 0;
+  color: var(--color-text);
+  background: var(--color-surface);
+  line-height: 1.5;
+}
+
+.muted {
+  color: var(--color-text-muted);
 }
 
 h1 {
-  margin-bottom: 0.25rem;
+  margin: 0 0 0.25rem;
+  letter-spacing: -0.01em;
 }
 
 a {
-  color: #2563eb;
+  color: var(--color-brand);
+  text-decoration: none;
 }
+
+a:hover {
+  text-decoration: underline;
+}
+
+/* ---------- app shell: top nav + centered page column ---------- */
+
+.nav {
+  background: var(--color-bg);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.nav-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-1) var(--space-2);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.brand {
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--color-brand);
+}
+
+.brand:hover {
+  text-decoration: none;
+}
+
+.nav-user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-size: 0.85rem;
+}
+
+.nav-role {
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.15rem 0.6rem;
+}
+
+.nav-name {
+  font-weight: 600;
+}
+
+.nav-logout {
+  color: var(--color-text-muted);
+}
+
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: var(--space-3) var(--space-2) var(--space-4);
+}
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+/* ---------- login screen: its own centered card, no nav ---------- */
+
+.auth-body {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(180deg, var(--color-brand-soft), var(--color-surface) 60%);
+  padding: var(--space-2);
+}
+
+.auth-card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  padding: var(--space-3);
+  width: 100%;
+  max-width: 360px;
+}
+
+.auth-card form {
+  max-width: none;
+}
+
+.radio-option {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--color-text);
+}
+
+/* ---------- generic surfaces ---------- */
+
+.card {
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-3);
+}
+
+.table-card {
+  padding: 0;
+  overflow-x: auto;
+}
+
+.empty-state {
+  background: var(--color-bg);
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-lg);
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--color-text-muted);
+}
+
+/* ---------- forms ---------- */
 
 form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
+  gap: var(--space-1);
   max-width: 400px;
-  margin: 1rem 0;
+  margin: var(--space-2) 0;
 }
 
 fieldset {
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: var(--space-1) var(--space-2);
 }
 
 label {
@@ -32,50 +211,89 @@ label {
   flex-direction: column;
   gap: 0.25rem;
   font-size: 0.9rem;
+  color: var(--color-text-muted);
 }
 
 input, select, textarea, button {
   font: inherit;
-  padding: 0.4rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
+  padding: 0.5rem 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  color: var(--color-text);
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 1px;
+  border-color: var(--color-brand);
 }
 
 button {
-  background: #2563eb;
+  background: var(--color-brand);
   color: white;
   border: none;
   cursor: pointer;
-  padding: 0.5rem;
+  padding: 0.6rem var(--space-2);
+  font-weight: 600;
+  transition: background 0.15s ease;
 }
 
 button:hover {
-  background: #1d4ed8;
+  background: var(--color-brand-hover);
 }
+
+.button-link {
+  display: inline-block;
+  background: var(--color-brand);
+  color: white;
+  border-radius: var(--radius);
+  padding: 0.6rem var(--space-2);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.button-link:hover {
+  background: var(--color-brand-hover);
+  text-decoration: none;
+}
+
+/* ---------- tables ---------- */
 
 table {
   border-collapse: collapse;
   width: 100%;
-  margin-top: 1rem;
 }
 
 th, td {
   text-align: left;
-  padding: 0.5rem;
-  border-bottom: 1px solid #e5e5e5;
+  padding: var(--space-1) var(--space-2);
+  border-bottom: 1px solid var(--color-border);
   vertical-align: top;
 }
 
-th {
-  background: #f4f4f5;
+tbody tr:last-child td {
+  border-bottom: none;
 }
 
-/* admin dashboard status forms are inline, not stacked full-width */
+th {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.type-cell {
+  text-transform: capitalize;
+}
+
+/* status forms live inside a table cell alongside a badge, so they run
+   inline and stay compact rather than using the page-level form layout */
 td form {
   flex-direction: row;
   align-items: flex-start;
   max-width: none;
-  margin: 0;
+  margin: var(--space-1) 0 0;
 }
 
 td form textarea {
@@ -84,4 +302,29 @@ td form textarea {
 
 td:nth-child(3) {
   max-width: 20rem;
+}
+
+/* ---------- status badges ---------- */
+
+.badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.badge-open {
+  background: var(--color-status-open-bg);
+  color: var(--color-status-open);
+}
+
+.badge-in_progress {
+  background: var(--color-status-progress-bg);
+  color: var(--color-status-progress);
+}
+
+.badge-resolved {
+  background: var(--color-status-resolved-bg);
+  color: var(--color-status-resolved);
 }

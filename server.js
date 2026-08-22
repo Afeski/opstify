@@ -115,8 +115,11 @@ app.use(express.static(__dirname + '/public'));
 
 app.use(express.urlencoded({ extended: true }));
 
+// falls back to a fixed dev-only value so local development needs no setup;
+// set SESSION_SECRET in the environment for anything beyond local/demo use,
+// since the fallback is public (it's in this repo's source).
 app.use(session({
-  secret: 'peopleops-dev-secret',
+  secret: process.env.SESSION_SECRET || 'peopleops-dev-secret',
   resave: false,
   saveUninitialized: false,
 }));

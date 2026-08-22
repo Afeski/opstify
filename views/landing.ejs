@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body class="landing-body">
+  <header class="landing-header">
+    <span class="brand">Opstify</span>
+    <a href="<%= loggedIn ? '/dashboard' : '/login' %>" class="button-link">
+      <%= loggedIn ? 'Go to Dashboard' : 'Sign In' %>
+    </a>
+  </header>
+
+  <section class="hero">
+    <h1>PeopleOps requests, in one place</h1>
+    <p class="hero-tagline">
+      Submit time-off, equipment, and policy requests — and give PeopleOps a
+      single queue to triage, track, and resolve them, instead of a scattered
+      inbox.
+    </p>
+    <a href="<%= loggedIn ? '/dashboard' : '/login' %>" class="button-link hero-cta">
+      <%= loggedIn ? 'Go to Dashboard' : 'Sign In to Opstify' %>
+    </a>
+  </section>
+
+  <section class="feature-grid">
+    <div class="card">
+      <h2>Submit a request</h2>
+      <p class="muted">PTO, equipment, onboarding tasks, or a policy question — logged in seconds, no email thread required.</p>
+    </div>
+    <div class="card">
+      <h2>Track status in real time</h2>
+      <p class="muted">Every request shows exactly where it stands — open, in progress, or resolved — with notes from PeopleOps.</p>
+    </div>
+    <div class="card">
+      <h2>PeopleOps reviews &amp; resolves</h2>
+      <p class="muted">One queue, oldest open requests first, so nothing sits unanswered.</p>
+    </div>
+  </section>
+
+  <footer class="landing-footer">
+    <p class="muted">Opstify &middot; internal PeopleOps tool</p>
+  </footer>
+</body>
+</html>

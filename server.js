@@ -49,6 +49,13 @@ app.use((req, res, next) => {
 });
 
 app.get('/', (req, res) => {
+  res.render('landing', { title: 'Welcome', loggedIn: !!req.user });
+});
+
+app.get('/login', (req, res) => {
+  if (req.session.userId) {
+    return res.redirect('/dashboard');
+  }
   res.render('login', { title: 'Sign In' });
 });
 
@@ -86,7 +93,7 @@ app.post('/login', (req, res) => {
 
 function requireEmployee(req, res, next) {
   if (!req.session.userId) {
-    return res.redirect('/');
+    return res.redirect('/login');
   }
   if (req.user.role !== 'employee') {
     return renderError(res, 403, 'Only employees can submit requests.');
@@ -114,7 +121,7 @@ app.post('/requests', requireEmployee, (req, res) => {
 
 app.get('/dashboard', (req, res) => {
   if (!req.session.userId) {
-    return res.redirect('/');
+    return res.redirect('/login');
   }
 
   const flash = req.query.flash || null;
@@ -161,7 +168,7 @@ app.get('/dashboard', (req, res) => {
 
 app.get('/requests/:id', (req, res) => {
   if (!req.session.userId) {
-    return res.redirect('/');
+    return res.redirect('/login');
   }
 
   const request = db
@@ -190,13 +197,13 @@ app.get('/requests/:id', (req, res) => {
 
 app.get('/logout', (req, res) => {
   req.session.destroy(() => {
-    res.redirect('/');
+    res.redirect('/login');
   });
 });
 
 function requireAdmin(req, res, next) {
   if (!req.session.userId) {
-    return res.redirect('/');
+    return res.redirect('/login');
   }
   if (req.user.role !== 'admin') {
     return renderError(res, 403, 'Admins only.');

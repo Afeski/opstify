@@ -307,7 +307,7 @@ a:hover {
   font-size: 0.9rem;
 }
 
-/* ---------- hero product preview ---------- */
+/* ---------- hero image ---------- */
 
 .hero-visual {
   position: relative;
@@ -328,69 +328,15 @@ a:hover {
   z-index: 0;
 }
 
-.preview-window {
+.hero-image {
   position: relative;
   z-index: 1;
   width: 100%;
-  max-width: 360px;
-  overflow: hidden;
-  background: var(--color-bg);
-  border: 1px solid var(--color-border);
+  max-width: 440px;
+  height: auto;
+  display: block;
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-md);
-}
-
-.preview-chrome {
-  display: flex;
-  gap: 0.4rem;
-  padding: 0.6rem var(--space-2);
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.preview-dot {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-}
-
-.preview-dot--red {
-  background: #f87171;
-}
-
-.preview-dot--yellow {
-  background: #fbbf24;
-}
-
-.preview-dot--green {
-  background: #4ade80;
-}
-
-.preview-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  padding: var(--space-2);
-}
-
-.preview-row {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--space-1);
-}
-
-.preview-title {
-  margin: 0;
-  font-weight: 600;
-  font-size: 0.85rem;
-}
-
-.preview-sub {
-  margin: 0.1rem 0 0;
-  color: var(--color-text-muted);
-  font-size: 0.78rem;
 }
 
 /* ---------- feature grid ---------- */

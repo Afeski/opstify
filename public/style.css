@@ -25,6 +25,12 @@
   --color-status-resolved: #15803d;
   --color-status-resolved-bg: #dcfce7;
 
+  /* priority is a separate axis from status — deliberately a lighter-weight
+     text treatment (not a filled pill) so it doesn't visually compete with
+     the status badge for attention in the same row */
+  --color-priority-high: #ea580c;
+  --color-priority-urgent: #dc2626;
+
   --radius: 8px;
   --radius-lg: 12px;
   --space-1: 0.5rem;
@@ -409,6 +415,19 @@ form {
   margin: var(--space-2) 0;
 }
 
+.filter-bar {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  max-width: none;
+  margin-bottom: var(--space-2);
+}
+
+.filter-bar input[type="text"] {
+  flex: 1;
+  min-width: 200px;
+}
+
 fieldset {
   border: 1px solid var(--color-border);
   border-radius: var(--radius);
@@ -505,6 +524,38 @@ th {
   font-size: 0.75rem;
 }
 
+.assignee-info {
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  margin: 0.3rem 0;
+}
+
+/* the "Assign to me" quick-action form sits inline with the assignee text
+   rather than as its own block/flex row like the other forms in this cell */
+.assignee-info form.inline-action {
+  display: inline;
+  margin: 0;
+}
+
+/* a form's submit button styled to read as a secondary text link, for a
+   quick one-click action (e.g. "Assign to me") that shouldn't visually
+   compete with the primary "Update" button in the same cell */
+.link-button {
+  background: none;
+  border: none;
+  color: var(--color-brand);
+  padding: 0;
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.link-button:hover {
+  background: none;
+  color: var(--color-brand-hover);
+}
+
 /* status forms live inside a table cell alongside a badge, so they run
    inline and stay compact rather than using the page-level form layout */
 td form {
@@ -545,4 +596,27 @@ td:nth-child(3) {
 .badge-resolved {
   background: var(--color-status-resolved-bg);
   color: var(--color-status-resolved);
+}
+
+/* ---------- priority indicators ---------- */
+/* only rendered for non-"normal" priorities — the common case stays quiet
+   so a Low/High/Urgent marker actually stands out when it does appear */
+
+.priority {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.priority-low {
+  color: var(--color-text-muted);
+}
+
+.priority-high {
+  color: var(--color-priority-high);
+}
+
+.priority-urgent {
+  color: var(--color-priority-urgent);
 }

@@ -14,6 +14,8 @@ CREATE TABLE IF NOT EXISTS requests (
   type TEXT NOT NULL CHECK (type IN ('pto', 'equipment', 'onboarding', 'policy_question', 'other')),
   description TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'in_progress', 'resolved')),
+  priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+  assigned_to INTEGER REFERENCES users(id),
   admin_notes TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now')),
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))

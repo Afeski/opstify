@@ -15,9 +15,53 @@
 
     <%- include('partials/stats', { stats }) %>
 
+    <form method="GET" action="/dashboard" class="filter-bar">
+      <input type="text" name="q" placeholder="Search description or requester..." value="<%= filters.q || '' %>">
+
+      <select name="status">
+        <option value="">All statuses</option>
+        <option value="open" <%= filters.status === 'open' ? 'selected' : '' %>>Open</option>
+        <option value="in_progress" <%= filters.status === 'in_progress' ? 'selected' : '' %>>In progress</option>
+        <option value="resolved" <%= filters.status === 'resolved' ? 'selected' : '' %>>Resolved</option>
+      </select>
+
+      <select name="type">
+        <option value="">All types</option>
+        <option value="pto" <%= filters.type === 'pto' ? 'selected' : '' %>>PTO</option>
+        <option value="equipment" <%= filters.type === 'equipment' ? 'selected' : '' %>>Equipment</option>
+        <option value="onboarding" <%= filters.type === 'onboarding' ? 'selected' : '' %>>Onboarding</option>
+        <option value="policy_question" <%= filters.type === 'policy_question' ? 'selected' : '' %>>Policy question</option>
+        <option value="other" <%= filters.type === 'other' ? 'selected' : '' %>>Other</option>
+      </select>
+
+      <select name="priority">
+        <option value="">All priorities</option>
+        <option value="low" <%= filters.priority === 'low' ? 'selected' : '' %>>Low</option>
+        <option value="normal" <%= filters.priority === 'normal' ? 'selected' : '' %>>Normal</option>
+        <option value="high" <%= filters.priority === 'high' ? 'selected' : '' %>>High</option>
+        <option value="urgent" <%= filters.priority === 'urgent' ? 'selected' : '' %>>Urgent</option>
+      </select>
+
+      <select name="assigned_to">
+        <option value="">Anyone</option>
+        <option value="unassigned" <%= filters.assigned_to === 'unassigned' ? 'selected' : '' %>>Unassigned</option>
+        <option value="me" <%= filters.assigned_to === 'me' ? 'selected' : '' %>>Assigned to me</option>
+        <% adminUsers.forEach(function(u) { %>
+          <option value="<%= u.id %>" <%= filters.assigned_to === String(u.id) ? 'selected' : '' %>><%= u.name %></option>
+        <% }); %>
+      </select>
+
+      <button type="submit">Filter</button>
+      <% if (hasActiveFilters) { %><a href="/dashboard">Clear filters</a><% } %>
+    </form>
+
+    <% if (hasActiveFilters) { %>
+      <p class="muted"><%= requests.length %> matching request<%= requests.length === 1 ? '' : 's' %></p>
+    <% } %>
+
     <% if (requests.length === 0) { %>
       <div class="empty-state">
-        <p>No requests have been submitted yet.</p>
+        <p><%= hasActiveFilters ? 'No requests match these filters.' : 'No requests have been submitted yet.' %></p>
       </div>
     <% } else { %>
       <div class="card table-card">
@@ -46,11 +90,39 @@
                 <td class="muted"><%= r.created_at %></td>
                 <td>
                   <span class="badge badge-<%= r.status %>"><%= STATUS_LABELS[r.status] %></span>
+                  <% if (r.priority !== 'normal') { %>
+                    <span class="priority priority-<%= r.priority %>">&#9679; <%= PRIORITY_LABELS[r.priority] %></span>
+                  <% } %>
+                  <div class="assignee-info">
+                    <%= r.assignee_name ? 'Assigned to ' + r.assignee_name : 'Unassigned' %>
+                    <% if (r.assigned_to !== currentUserId) { %>
+                      &middot;
+                      <form method="POST" action="/requests/<%= r.id %>/status" class="inline-action">
+                        <input type="hidden" name="status" value="<%= r.status %>">
+                        <input type="hidden" name="priority" value="<%= r.priority %>">
+                        <input type="hidden" name="admin_notes" value="<%= r.admin_notes || '' %>">
+                        <input type="hidden" name="assigned_to" value="<%= currentUserId %>">
+                        <button type="submit" class="link-button">Assign to me</button>
+                      </form>
+                    <% } %>
+                  </div>
                   <form method="POST" action="/requests/<%= r.id %>/status">
                     <select name="status">
                       <option value="open" <%= r.status === 'open' ? 'selected' : '' %>>Open</option>
                       <option value="in_progress" <%= r.status === 'in_progress' ? 'selected' : '' %>>In progress</option>
                       <option value="resolved" <%= r.status === 'resolved' ? 'selected' : '' %>>Resolved</option>
+                    </select>
+                    <select name="priority">
+                      <option value="low" <%= r.priority === 'low' ? 'selected' : '' %>>Low</option>
+                      <option value="normal" <%= r.priority === 'normal' ? 'selected' : '' %>>Normal</option>
+                      <option value="high" <%= r.priority === 'high' ? 'selected' : '' %>>High</option>
+                      <option value="urgent" <%= r.priority === 'urgent' ? 'selected' : '' %>>Urgent</option>
+                    </select>
+                    <select name="assigned_to">
+                      <option value="">Unassigned</option>
+                      <% adminUsers.forEach(function(u) { %>
+                        <option value="<%= u.id %>" <%= r.assigned_to === u.id ? 'selected' : '' %>><%= u.name %></option>
+                      <% }); %>
                     </select>
                     <textarea name="admin_notes" rows="2" placeholder="Internal notes"><%= r.admin_notes || '' %></textarea>
                     <button type="submit">Update</button>

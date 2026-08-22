@@ -18,7 +18,12 @@
           <% } %>
         </p>
       </div>
-      <span class="badge badge-<%= request.status %>"><%= STATUS_LABELS[request.status] %></span>
+      <span>
+        <span class="badge badge-<%= request.status %>"><%= STATUS_LABELS[request.status] %></span>
+        <% if (request.priority !== 'normal') { %>
+          <span class="priority priority-<%= request.priority %>">&#9679; <%= PRIORITY_LABELS[request.priority] %></span>
+        <% } %>
+      </span>
     </div>
 
     <div class="card">
@@ -28,12 +33,25 @@
       <h2>Admin notes</h2>
       <p class="preserve-whitespace muted"><%= request.admin_notes || 'No notes yet.' %></p>
 
-      <p class="muted">Submitted <%= request.created_at %> &middot; Last updated <%= request.updated_at %></p>
+      <p class="muted">
+        Submitted <%= request.created_at %> &middot; Last updated <%= request.updated_at %>
+        &middot; <%= request.assignee_name ? 'Assigned to ' + request.assignee_name : 'Unassigned' %>
+      </p>
     </div>
 
     <% if (role === 'admin') { %>
       <div class="card">
         <h2>Update status</h2>
+        <% if (request.assigned_to !== currentUserId) { %>
+          <form method="POST" action="/requests/<%= request.id %>/status" class="inline-action">
+            <input type="hidden" name="next" value="/requests/<%= request.id %>">
+            <input type="hidden" name="status" value="<%= request.status %>">
+            <input type="hidden" name="priority" value="<%= request.priority %>">
+            <input type="hidden" name="admin_notes" value="<%= request.admin_notes || '' %>">
+            <input type="hidden" name="assigned_to" value="<%= currentUserId %>">
+            <button type="submit" class="link-button">Assign to me</button>
+          </form>
+        <% } %>
         <form method="POST" action="/requests/<%= request.id %>/status">
           <input type="hidden" name="next" value="/requests/<%= request.id %>">
           <label>
@@ -42,6 +60,24 @@
               <option value="open" <%= request.status === 'open' ? 'selected' : '' %>>Open</option>
               <option value="in_progress" <%= request.status === 'in_progress' ? 'selected' : '' %>>In progress</option>
               <option value="resolved" <%= request.status === 'resolved' ? 'selected' : '' %>>Resolved</option>
+            </select>
+          </label>
+          <label>
+            Priority
+            <select name="priority">
+              <option value="low" <%= request.priority === 'low' ? 'selected' : '' %>>Low</option>
+              <option value="normal" <%= request.priority === 'normal' ? 'selected' : '' %>>Normal</option>
+              <option value="high" <%= request.priority === 'high' ? 'selected' : '' %>>High</option>
+              <option value="urgent" <%= request.priority === 'urgent' ? 'selected' : '' %>>Urgent</option>
+            </select>
+          </label>
+          <label>
+            Assigned to
+            <select name="assigned_to">
+              <option value="">Unassigned</option>
+              <% adminUsers.forEach(function(u) { %>
+                <option value="<%= u.id %>" <%= request.assigned_to === u.id ? 'selected' : '' %>><%= u.name %></option>
+              <% }); %>
             </select>
           </label>
           <label>

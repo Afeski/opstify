@@ -5,6 +5,8 @@ const db = require('./db/database');
 const VALID_TYPES = ['pto', 'equipment', 'onboarding', 'policy_question', 'other'];
 const VALID_STATUSES = ['open', 'in_progress', 'resolved'];
 const STATUS_LABELS = { open: 'Open', in_progress: 'In progress', resolved: 'Resolved' };
+const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
+const PRIORITY_LABELS = { low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent' };
 
 function renderError(res, status, message) {
   res.status(status).render('error', { title: `${status} Error`, status, message });
@@ -17,6 +19,51 @@ function computeStats(statusCounts) {
     stats.total += row.count;
   }
   return stats;
+}
+
+// Builds a parameterized WHERE clause for the admin dashboard from
+// whitelisted query params only — an unrecognized/tampered value for any
+// filter is silently ignored (that filter just doesn't apply), rather than
+// crashing the query or matching everything.
+function buildAdminFilters(query, adminUsers, currentUserId) {
+  const conditions = [];
+  const params = [];
+
+  if (VALID_STATUSES.includes(query.status)) {
+    conditions.push('requests.status = ?');
+    params.push(query.status);
+  }
+
+  if (VALID_TYPES.includes(query.type)) {
+    conditions.push('requests.type = ?');
+    params.push(query.type);
+  }
+
+  if (VALID_PRIORITIES.includes(query.priority)) {
+    conditions.push('requests.priority = ?');
+    params.push(query.priority);
+  }
+
+  if (query.assigned_to === 'unassigned') {
+    conditions.push('requests.assigned_to IS NULL');
+  } else if (query.assigned_to === 'me') {
+    conditions.push('requests.assigned_to = ?');
+    params.push(currentUserId);
+  } else if (query.assigned_to && adminUsers.some((u) => String(u.id) === query.assigned_to)) {
+    conditions.push('requests.assigned_to = ?');
+    params.push(Number(query.assigned_to));
+  }
+
+  const searchTerm = query.q && query.q.trim();
+  if (searchTerm) {
+    conditions.push('(requests.description LIKE ? OR requests.requester_name LIKE ?)');
+    params.push(`%${searchTerm}%`, `%${searchTerm}%`);
+  }
+
+  return {
+    where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
+    params,
+  };
 }
 
 const app = express();
@@ -128,7 +175,13 @@ app.get('/dashboard', (req, res) => {
 
   if (req.user.role === 'employee') {
     const requests = db
-      .prepare('SELECT * FROM requests WHERE user_id = ? ORDER BY created_at DESC')
+      .prepare(
+        `SELECT requests.*, assignee.name AS assignee_name
+         FROM requests
+         LEFT JOIN users AS assignee ON assignee.id = requests.assigned_to
+         WHERE requests.user_id = ?
+         ORDER BY requests.created_at DESC`
+      )
       .all(req.user.id);
     const statusCounts = db
       .prepare('SELECT status, COUNT(*) as count FROM requests WHERE user_id = ? GROUP BY status')
@@ -139,28 +192,43 @@ app.get('/dashboard', (req, res) => {
       role: req.user.role,
       requests,
       STATUS_LABELS,
+      PRIORITY_LABELS,
       stats: computeStats(statusCounts),
       flash,
     });
   }
 
+  const adminUsers = db.prepare("SELECT id, name FROM users WHERE role = 'admin' ORDER BY name").all();
+  const { where, params } = buildAdminFilters(req.query, adminUsers, req.user.id);
+  const filterKeys = ['q', 'status', 'type', 'priority', 'assigned_to'];
+  const hasActiveFilters = filterKeys.some((key) => req.query[key]);
+
   const requests = db
     .prepare(`
-      SELECT requests.*, users.department, users.job_title
+      SELECT requests.*, requester.department, requester.job_title, assignee.name AS assignee_name
       FROM requests
-      LEFT JOIN users ON users.id = requests.user_id
+      LEFT JOIN users AS requester ON requester.id = requests.user_id
+      LEFT JOIN users AS assignee ON assignee.id = requests.assigned_to
+      ${where}
       ORDER BY
         CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
         created_at ASC
     `)
-    .all();
+    .all(...params);
+  // stats intentionally reflect the whole queue, not the filtered view —
+  // they're meant as "overall queue health," not a summary of the search
   const statusCounts = db.prepare('SELECT status, COUNT(*) as count FROM requests GROUP BY status').all();
   res.render('admin-dashboard', {
     title: 'All Requests',
     name: req.user.name,
     role: req.user.role,
+    currentUserId: req.user.id,
     requests,
     STATUS_LABELS,
+    PRIORITY_LABELS,
+    adminUsers,
+    filters: req.query,
+    hasActiveFilters,
     stats: computeStats(statusCounts),
     flash,
   });
@@ -173,9 +241,10 @@ app.get('/requests/:id', (req, res) => {
 
   const request = db
     .prepare(
-      `SELECT requests.*, users.department, users.job_title
+      `SELECT requests.*, requester.department, requester.job_title, assignee.name AS assignee_name
        FROM requests
-       LEFT JOIN users ON users.id = requests.user_id
+       LEFT JOIN users AS requester ON requester.id = requests.user_id
+       LEFT JOIN users AS assignee ON assignee.id = requests.assigned_to
        WHERE requests.id = ?`
     )
     .get(req.params.id);
@@ -185,12 +254,20 @@ app.get('/requests/:id', (req, res) => {
     return renderError(res, 404, 'Request not found.');
   }
 
+  const adminUsers =
+    req.user.role === 'admin'
+      ? db.prepare("SELECT id, name FROM users WHERE role = 'admin' ORDER BY name").all()
+      : [];
+
   res.render('request-detail', {
     title: `Request #${request.id}`,
     name: req.user.name,
     role: req.user.role,
+    currentUserId: req.user.id,
     request,
     STATUS_LABELS,
+    PRIORITY_LABELS,
+    adminUsers,
     flash: req.query.flash || null,
   });
 });
@@ -212,15 +289,35 @@ function requireAdmin(req, res, next) {
 }
 
 app.post('/requests/:id/status', requireAdmin, (req, res) => {
-  const { status, admin_notes } = req.body;
+  const { status, priority, admin_notes } = req.body;
 
   if (!VALID_STATUSES.includes(status)) {
     return renderError(res, 400, 'Invalid status.');
   }
 
+  if (!VALID_PRIORITIES.includes(priority)) {
+    return renderError(res, 400, 'Invalid priority.');
+  }
+
+  // empty string means "Unassigned" (-> NULL); anything else must resolve to
+  // an actual admin user's id — not just any user id, and not an arbitrary
+  // number a request could be tampered to submit
+  let assignedTo = null;
+  if (req.body.assigned_to) {
+    const assignee = db
+      .prepare("SELECT id FROM users WHERE id = ? AND role = 'admin'")
+      .get(req.body.assigned_to);
+    if (!assignee) {
+      return renderError(res, 400, 'Invalid assignee.');
+    }
+    assignedTo = assignee.id;
+  }
+
   const result = db
-    .prepare("UPDATE requests SET status = ?, admin_notes = ?, updated_at = datetime('now') WHERE id = ?")
-    .run(status, admin_notes ? admin_notes.trim() : null, req.params.id);
+    .prepare(
+      "UPDATE requests SET status = ?, priority = ?, assigned_to = ?, admin_notes = ?, updated_at = datetime('now') WHERE id = ?"
+    )
+    .run(status, priority, assignedTo, admin_notes ? admin_notes.trim() : null, req.params.id);
 
   if (result.changes === 0) {
     return renderError(res, 404, 'Request not found.');

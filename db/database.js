@@ -42,4 +42,26 @@ function migrateUserIds(db) {
 
 migrateUserIds(db);
 
+// Adds requests.priority and requests.assigned_to if missing. Both are safe
+// to add with a plain ALTER TABLE (unlike user_id, no relational backfill is
+// needed): priority's DEFAULT 'normal' satisfies its own CHECK constraint for
+// every pre-existing row, and assigned_to is meant to start out NULL
+// (unassigned) for old and new requests alike.
+function migrateRequestFields(db) {
+  const columns = db.prepare('PRAGMA table_info(requests)').all();
+  const columnNames = columns.map((col) => col.name);
+
+  if (!columnNames.includes('priority')) {
+    db.exec(
+      "ALTER TABLE requests ADD COLUMN priority TEXT NOT NULL DEFAULT 'normal' CHECK (priority IN ('low', 'normal', 'high', 'urgent'))"
+    );
+  }
+
+  if (!columnNames.includes('assigned_to')) {
+    db.exec('ALTER TABLE requests ADD COLUMN assigned_to INTEGER REFERENCES users(id)');
+  }
+}
+
+migrateRequestFields(db);
+
 module.exports = db;

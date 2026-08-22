@@ -38,35 +38,64 @@ app.use((req, res, next) => {
   next();
 });
 
+// loads the full user row for the logged-in session (id, name, role,
+// department, job_title) so routes read req.user instead of trusting
+// whatever was typed into the login form for this session alone.
+app.use((req, res, next) => {
+  if (req.session.userId) {
+    req.user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.session.userId);
+  }
+  next();
+});
+
 app.get('/', (req, res) => {
   res.render('login', { title: 'Sign In' });
 });
 
 app.post('/login', (req, res) => {
-  const { name, role } = req.body;
+  const { name, role, department, job_title } = req.body;
 
   if (!name || !name.trim() || !['employee', 'admin'].includes(role)) {
     return renderError(res, 400, 'Name and a valid role are required.');
   }
 
-  req.session.name = name.trim();
-  req.session.role = role;
+  const trimmedName = name.trim();
+  const trimmedDepartment = department && department.trim() ? department.trim() : null;
+  const trimmedJobTitle = job_title && job_title.trim() ? job_title.trim() : null;
+
+  let user = db.prepare('SELECT * FROM users WHERE name = ? AND role = ?').get(trimmedName, role);
+
+  if (!user) {
+    const result = db
+      .prepare('INSERT INTO users (name, role, department, job_title) VALUES (?, ?, ?, ?)')
+      .run(trimmedName, role, trimmedDepartment, trimmedJobTitle);
+    user = { id: result.lastInsertRowid };
+  } else if (trimmedDepartment || trimmedJobTitle) {
+    // only overwrite a field when a new non-empty value was actually given —
+    // leaving the login fields blank on a later login must never erase a
+    // department/job title someone already set
+    db.prepare(
+      'UPDATE users SET department = COALESCE(?, department), job_title = COALESCE(?, job_title) WHERE id = ?'
+    ).run(trimmedDepartment, trimmedJobTitle, user.id);
+  }
+
+  req.session.userId = user.id;
 
   res.redirect('/dashboard');
 });
 
 function requireEmployee(req, res, next) {
-  if (!req.session.name) {
+  if (!req.session.userId) {
     return res.redirect('/');
   }
-  if (req.session.role !== 'employee') {
+  if (req.user.role !== 'employee') {
     return renderError(res, 403, 'Only employees can submit requests.');
   }
   next();
 }
 
 app.get('/requests/new', requireEmployee, (req, res) => {
-  res.render('new-request', { title: 'New Request', name: req.session.name, role: req.session.role });
+  res.render('new-request', { title: 'New Request', name: req.user.name, role: req.user.role });
 });
 
 app.post('/requests', requireEmployee, (req, res) => {
@@ -77,30 +106,30 @@ app.post('/requests', requireEmployee, (req, res) => {
   }
 
   db.prepare(
-    'INSERT INTO requests (requester_name, type, description) VALUES (?, ?, ?)'
-  ).run(req.session.name, type, description.trim());
+    'INSERT INTO requests (requester_name, user_id, type, description) VALUES (?, ?, ?, ?)'
+  ).run(req.user.name, req.user.id, type, description.trim());
 
   res.redirect('/dashboard?flash=' + encodeURIComponent('Request submitted.'));
 });
 
 app.get('/dashboard', (req, res) => {
-  if (!req.session.name) {
+  if (!req.session.userId) {
     return res.redirect('/');
   }
 
   const flash = req.query.flash || null;
 
-  if (req.session.role === 'employee') {
+  if (req.user.role === 'employee') {
     const requests = db
-      .prepare('SELECT * FROM requests WHERE requester_name = ? ORDER BY created_at DESC')
-      .all(req.session.name);
+      .prepare('SELECT * FROM requests WHERE user_id = ? ORDER BY created_at DESC')
+      .all(req.user.id);
     const statusCounts = db
-      .prepare('SELECT status, COUNT(*) as count FROM requests WHERE requester_name = ? GROUP BY status')
-      .all(req.session.name);
+      .prepare('SELECT status, COUNT(*) as count FROM requests WHERE user_id = ? GROUP BY status')
+      .all(req.user.id);
     return res.render('employee-dashboard', {
       title: 'My Requests',
-      name: req.session.name,
-      role: req.session.role,
+      name: req.user.name,
+      role: req.user.role,
       requests,
       STATUS_LABELS,
       stats: computeStats(statusCounts),
@@ -110,7 +139,9 @@ app.get('/dashboard', (req, res) => {
 
   const requests = db
     .prepare(`
-      SELECT * FROM requests
+      SELECT requests.*, users.department, users.job_title
+      FROM requests
+      LEFT JOIN users ON users.id = requests.user_id
       ORDER BY
         CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
         created_at ASC
@@ -119,8 +150,8 @@ app.get('/dashboard', (req, res) => {
   const statusCounts = db.prepare('SELECT status, COUNT(*) as count FROM requests GROUP BY status').all();
   res.render('admin-dashboard', {
     title: 'All Requests',
-    name: req.session.name,
-    role: req.session.role,
+    name: req.user.name,
+    role: req.user.role,
     requests,
     STATUS_LABELS,
     stats: computeStats(statusCounts),
@@ -129,12 +160,19 @@ app.get('/dashboard', (req, res) => {
 });
 
 app.get('/requests/:id', (req, res) => {
-  if (!req.session.name) {
+  if (!req.session.userId) {
     return res.redirect('/');
   }
 
-  const request = db.prepare('SELECT * FROM requests WHERE id = ?').get(req.params.id);
-  const canView = request && (req.session.role === 'admin' || request.requester_name === req.session.name);
+  const request = db
+    .prepare(
+      `SELECT requests.*, users.department, users.job_title
+       FROM requests
+       LEFT JOIN users ON users.id = requests.user_id
+       WHERE requests.id = ?`
+    )
+    .get(req.params.id);
+  const canView = request && (req.user.role === 'admin' || request.user_id === req.user.id);
 
   if (!canView) {
     return renderError(res, 404, 'Request not found.');
@@ -142,8 +180,8 @@ app.get('/requests/:id', (req, res) => {
 
   res.render('request-detail', {
     title: `Request #${request.id}`,
-    name: req.session.name,
-    role: req.session.role,
+    name: req.user.name,
+    role: req.user.role,
     request,
     STATUS_LABELS,
     flash: req.query.flash || null,
@@ -157,10 +195,10 @@ app.get('/logout', (req, res) => {
 });
 
 function requireAdmin(req, res, next) {
-  if (!req.session.name) {
+  if (!req.session.userId) {
     return res.redirect('/');
   }
-  if (req.session.role !== 'admin') {
+  if (req.user.role !== 'admin') {
     return renderError(res, 403, 'Admins only.');
   }
   next();

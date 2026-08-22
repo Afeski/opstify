@@ -35,7 +35,12 @@
           <tbody>
             <% requests.forEach(function(r) { %>
               <tr>
-                <td><%= r.requester_name %></td>
+                <td>
+                  <%= r.requester_name %>
+                  <% if (r.department || r.job_title) { %>
+                    <span class="requester-meta"><%= [r.job_title, r.department].filter(Boolean).join(' · ') %></span>
+                  <% } %>
+                </td>
                 <td class="type-cell"><%= r.type.replace('_', ' ') %></td>
                 <td><%= r.description %></td>
                 <td class="muted"><%= r.created_at %></td>

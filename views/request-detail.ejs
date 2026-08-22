@@ -11,7 +11,12 @@
     <div class="page-header">
       <div>
         <h1>Request #<%= request.id %></h1>
-        <p class="muted"><%= request.type.replace('_', ' ') %> &middot; submitted by <%= request.requester_name %></p>
+        <p class="muted">
+          <%= request.type.replace('_', ' ') %> &middot; submitted by <%= request.requester_name %>
+          <% if (role === 'admin' && (request.department || request.job_title)) { %>
+            (<%= [request.job_title, request.department].filter(Boolean).join(', ') %>)
+          <% } %>
+        </p>
       </div>
       <span class="badge badge-<%= request.status %>"><%= STATUS_LABELS[request.status] %></span>
     </div>

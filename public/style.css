@@ -447,6 +447,12 @@ th {
   text-transform: capitalize;
 }
 
+.requester-meta {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+}
+
 /* status forms live inside a table cell alongside a badge, so they run
    inline and stay compact rather than using the page-level form layout */
 td form {

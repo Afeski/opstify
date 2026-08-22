@@ -10,29 +10,81 @@
   </header>
 
   <section class="hero">
-    <h1>PeopleOps requests, in one place</h1>
-    <p class="hero-tagline">
-      Submit time-off, equipment, and policy requests — and give PeopleOps a
-      single queue to triage, track, and resolve them, instead of a scattered
-      inbox.
-    </p>
-    <a href="<%= loggedIn ? '/dashboard' : '/login' %>" class="button-link hero-cta">
-      <%= loggedIn ? 'Go to Dashboard' : 'Sign In to Opstify' %>
-    </a>
+    <div class="hero-grid">
+      <div class="hero-copy">
+        <p class="eyebrow">Internal PeopleOps tool</p>
+        <h1>One tool to manage all <span class="hero-highlight">your team requests</span></h1>
+        <p class="hero-tagline">
+          Employees submit requests in seconds. PeopleOps gets one queue to
+          search, prioritize, assign, and resolve them — no more scattered
+          email threads.
+        </p>
+        <div class="hero-actions">
+          <a href="<%= loggedIn ? '/dashboard' : '/login' %>" class="button-link hero-cta">
+            <%= loggedIn ? 'Go to Dashboard' : 'Sign In to Opstify' %>
+          </a>
+          <a href="#features" class="hero-secondary">See what's included &darr;</a>
+        </div>
+      </div>
+
+      <div class="hero-visual">
+        <div class="hero-blob"></div>
+        <div class="preview-window">
+          <div class="preview-chrome">
+            <span class="preview-dot preview-dot--red"></span>
+            <span class="preview-dot preview-dot--yellow"></span>
+            <span class="preview-dot preview-dot--green"></span>
+          </div>
+          <div class="preview-body">
+            <div class="preview-row">
+              <div>
+                <p class="preview-title">PTO request</p>
+                <p class="preview-sub">Family trip in September</p>
+              </div>
+              <span class="badge badge-open">Open</span>
+            </div>
+            <div class="preview-row">
+              <div>
+                <p class="preview-title">Equipment</p>
+                <p class="preview-sub">New monitor for home office</p>
+              </div>
+              <span class="badge badge-in_progress">In progress</span>
+            </div>
+            <div class="preview-row">
+              <div>
+                <p class="preview-title">Policy question</p>
+                <p class="preview-sub">Parental leave policy</p>
+              </div>
+              <span class="badge badge-resolved">Resolved</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </section>
 
-  <section class="feature-grid">
-    <div class="card">
-      <h2>Submit a request</h2>
-      <p class="muted">PTO, equipment, onboarding tasks, or a policy question — logged in seconds, no email thread required.</p>
-    </div>
-    <div class="card">
-      <h2>Track status in real time</h2>
-      <p class="muted">Every request shows exactly where it stands — open, in progress, or resolved — with notes from PeopleOps.</p>
-    </div>
-    <div class="card">
-      <h2>PeopleOps reviews &amp; resolves</h2>
-      <p class="muted">One queue, oldest open requests first, so nothing sits unanswered.</p>
+  <section class="feature-section" id="features">
+    <div class="feature-grid">
+      <div class="card feature-card">
+        <span class="feature-icon">&#9997;&#65039;</span>
+        <h2>Submit a request</h2>
+        <p class="muted">PTO, equipment, onboarding tasks, or a policy question — logged in seconds, no email thread required.</p>
+      </div>
+      <div class="card feature-card">
+        <span class="feature-icon">&#128269;</span>
+        <h2>Search &amp; filter</h2>
+        <p class="muted">PeopleOps can search, filter by status/type/priority, and see who's assigned to what — instantly.</p>
+      </div>
+      <div class="card feature-card">
+        <span class="feature-icon">&#9989;</span>
+        <h2>Track status in real time</h2>
+        <p class="muted">Every request shows exactly where it stands — open, in progress, or resolved — with notes from PeopleOps.</p>
+      </div>
+      <div class="card feature-card">
+        <span class="feature-icon">&#128081;</span>
+        <h2>Prioritize &amp; assign</h2>
+        <p class="muted">Flag what's urgent and assign it to the right person on the team, so nothing falls through the cracks.</p>
+      </div>
     </div>
   </section>
 

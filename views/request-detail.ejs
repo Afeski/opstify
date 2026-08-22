@@ -39,6 +39,18 @@
       </p>
     </div>
 
+    <div class="card">
+      <h2>Activity</h2>
+      <ul class="activity-list">
+        <% activity.forEach(function(entry) { %>
+          <li class="activity-item">
+            <p class="activity-detail"><%= entry.detail %></p>
+            <p class="activity-meta muted"><%= entry.actor_name || 'System' %> &middot; <%= entry.created_at %></p>
+          </li>
+        <% }); %>
+      </ul>
+    </div>
+
     <% if (role === 'admin') { %>
       <div class="card">
         <h2>Update status</h2>

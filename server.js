@@ -66,6 +66,47 @@ function buildAdminFilters(query, adminUsers, currentUserId) {
   };
 }
 
+// Compares a request's old field values against the submitted new ones and
+// returns one { action, detail } message per field that actually changed —
+// nothing for fields resubmitted unchanged, so re-clicking "Update" with no
+// real edits logs zero activity rows.
+function buildActivityMessages(oldRow, newValues) {
+  const messages = [];
+
+  if (oldRow.status !== newValues.status) {
+    messages.push({
+      action: 'status_changed',
+      detail: `Status changed from ${STATUS_LABELS[oldRow.status]} to ${STATUS_LABELS[newValues.status]}`,
+    });
+  }
+
+  if (oldRow.priority !== newValues.priority) {
+    messages.push({
+      action: 'priority_changed',
+      detail: `Priority changed from ${PRIORITY_LABELS[oldRow.priority]} to ${PRIORITY_LABELS[newValues.priority]}`,
+    });
+  }
+
+  if (oldRow.assigned_to !== newValues.assignedTo) {
+    const { oldAssigneeName, newAssigneeName } = newValues;
+    let detail;
+    if (!oldAssigneeName && newAssigneeName) {
+      detail = `Assigned to ${newAssigneeName}`;
+    } else if (oldAssigneeName && !newAssigneeName) {
+      detail = `Unassigned (was ${oldAssigneeName})`;
+    } else {
+      detail = `Reassigned from ${oldAssigneeName} to ${newAssigneeName}`;
+    }
+    messages.push({ action: 'assignment_changed', detail });
+  }
+
+  if ((oldRow.admin_notes || null) !== newValues.adminNotes) {
+    messages.push({ action: 'notes_updated', detail: 'Internal notes updated' });
+  }
+
+  return messages;
+}
+
 const app = express();
 
 app.set('view engine', 'ejs');
@@ -159,9 +200,13 @@ app.post('/requests', requireEmployee, (req, res) => {
     return renderError(res, 400, 'A valid type and non-empty description are required.');
   }
 
+  const result = db
+    .prepare('INSERT INTO requests (requester_name, user_id, type, description) VALUES (?, ?, ?, ?)')
+    .run(req.user.name, req.user.id, type, description.trim());
+
   db.prepare(
-    'INSERT INTO requests (requester_name, user_id, type, description) VALUES (?, ?, ?, ?)'
-  ).run(req.user.name, req.user.id, type, description.trim());
+    'INSERT INTO request_activity (request_id, actor_user_id, actor_name, action, detail) VALUES (?, ?, ?, ?, ?)'
+  ).run(result.lastInsertRowid, req.user.id, req.user.name, 'submitted', 'Request submitted');
 
   res.redirect('/dashboard?flash=' + encodeURIComponent('Request submitted.'));
 });
@@ -259,12 +304,17 @@ app.get('/requests/:id', (req, res) => {
       ? db.prepare("SELECT id, name FROM users WHERE role = 'admin' ORDER BY name").all()
       : [];
 
+  const activity = db
+    .prepare('SELECT * FROM request_activity WHERE request_id = ? ORDER BY created_at DESC, id DESC')
+    .all(request.id);
+
   res.render('request-detail', {
     title: `Request #${request.id}`,
     name: req.user.name,
     role: req.user.role,
     currentUserId: req.user.id,
     request,
+    activity,
     STATUS_LABELS,
     PRIORITY_LABELS,
     adminUsers,
@@ -313,13 +363,44 @@ app.post('/requests/:id/status', requireAdmin, (req, res) => {
     assignedTo = assignee.id;
   }
 
-  const result = db
-    .prepare(
-      "UPDATE requests SET status = ?, priority = ?, assigned_to = ?, admin_notes = ?, updated_at = datetime('now') WHERE id = ?"
-    )
-    .run(status, priority, assignedTo, admin_notes ? admin_notes.trim() : null, req.params.id);
+  const trimmedNotes = admin_notes ? admin_notes.trim() : null;
 
-  if (result.changes === 0) {
+  // fetch-then-diff-then-log all happen atomically: if anything in here
+  // throws, better-sqlite3 rolls the whole thing back, so a request can
+  // never end up with its fields updated but no matching history entry
+  const updateAndLog = db.transaction((requestId) => {
+    const oldRow = db.prepare('SELECT * FROM requests WHERE id = ?').get(requestId);
+    if (!oldRow) {
+      return { changed: false };
+    }
+
+    db.prepare(
+      "UPDATE requests SET status = ?, priority = ?, assigned_to = ?, admin_notes = ?, updated_at = datetime('now') WHERE id = ?"
+    ).run(status, priority, assignedTo, trimmedNotes, requestId);
+
+    const lookupName = (id) => (id ? db.prepare('SELECT name FROM users WHERE id = ?').get(id)?.name : null);
+    const messages = buildActivityMessages(oldRow, {
+      status,
+      priority,
+      assignedTo,
+      adminNotes: trimmedNotes,
+      oldAssigneeName: lookupName(oldRow.assigned_to),
+      newAssigneeName: lookupName(assignedTo),
+    });
+
+    const insertActivity = db.prepare(
+      'INSERT INTO request_activity (request_id, actor_user_id, actor_name, action, detail) VALUES (?, ?, ?, ?, ?)'
+    );
+    for (const message of messages) {
+      insertActivity.run(requestId, req.user.id, req.user.name, message.action, message.detail);
+    }
+
+    return { changed: true };
+  });
+
+  const result = updateAndLog(req.params.id);
+
+  if (!result.changed) {
     return renderError(res, 404, 'Request not found.');
   }
 

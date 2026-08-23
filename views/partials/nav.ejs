@@ -8,6 +8,9 @@
     <% if (role === 'employee') { %>
       <a href="/requests/new" class="sidebar-link <%= currentPath === '/requests/new' ? 'active' : '' %>">New request</a>
     <% } %>
+    <% if (role === 'admin') { %>
+      <a href="/analytics" class="sidebar-link <%= currentPath === '/analytics' ? 'active' : '' %>">Analytics</a>
+    <% } %>
   </nav>
 
   <div class="sidebar-user">

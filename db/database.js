@@ -64,4 +64,20 @@ function migrateRequestFields(db) {
 
 migrateRequestFields(db);
 
+// Adds requests.resolved_at if missing. Unlike priority/assigned_to, this
+// one has no useful default for existing rows: we have no record of when a
+// pre-existing "resolved" request actually got resolved, so it's left NULL
+// for all of them rather than guessing (e.g. backfilling with updated_at,
+// which would silently overstate how fast old requests were resolved).
+function migrateResolvedAt(db) {
+  const columns = db.prepare('PRAGMA table_info(requests)').all();
+  const hasResolvedAt = columns.some((col) => col.name === 'resolved_at');
+
+  if (!hasResolvedAt) {
+    db.exec('ALTER TABLE requests ADD COLUMN resolved_at TEXT');
+  }
+}
+
+migrateResolvedAt(db);
+
 module.exports = db;

@@ -107,6 +107,29 @@ function buildActivityMessages(oldRow, newValues) {
   return messages;
 }
 
+// Formats a duration given in hours the way a human would read it: under a
+// day shows hours, a day or more shows days (one decimal place either way).
+// Returns null when there's no data yet, so the caller decides the fallback
+// text rather than this function inventing something like "0.0 hrs".
+function formatDuration(hours) {
+  if (hours === null || hours === undefined) {
+    return null;
+  }
+  if (hours < 24) {
+    return `${hours.toFixed(1)} hrs`;
+  }
+  return `${(hours / 24).toFixed(1)} days`;
+}
+
+// Turns a list of { key, count } rows into { key, count, pct } rows, where
+// pct is the bar width/height relative to the largest count — so the bar
+// list's own biggest bar is always full width, not scaled against some
+// unrelated total.
+function withBarPercentages(rows) {
+  const max = Math.max(1, ...rows.map((r) => r.count));
+  return rows.map((r) => ({ ...r, pct: Math.round((r.count / max) * 100) }));
+}
+
 const app = express();
 
 app.set('view engine', 'ejs');
@@ -341,6 +364,63 @@ function requireAdmin(req, res, next) {
   next();
 }
 
+app.get('/analytics', requireAdmin, (req, res) => {
+  const statusCounts = db.prepare('SELECT status, COUNT(*) as count FROM requests GROUP BY status').all();
+  const stats = computeStats(statusCounts);
+  const resolutionRate = stats.total ? Math.round((stats.resolved / stats.total) * 100) : 0;
+
+  const avgResolutionHours = db
+    .prepare(
+      "SELECT AVG((julianday(resolved_at) - julianday(created_at)) * 24) as avg_hours FROM requests WHERE resolved_at IS NOT NULL"
+    )
+    .get().avg_hours;
+  const avgResolutionLabel = formatDuration(avgResolutionHours) || 'No data yet';
+
+  // grouped by VALID_TYPES/VALID_PRIORITIES (not just what SQL returns) so a
+  // type or priority with zero requests still shows up as a zero-width bar
+  // instead of silently disappearing from the chart
+  const typeCounts = db.prepare('SELECT type, COUNT(*) as count FROM requests GROUP BY type').all();
+  const typeCountMap = Object.fromEntries(typeCounts.map((r) => [r.type, r.count]));
+  const typeBreakdown = withBarPercentages(VALID_TYPES.map((type) => ({ type, count: typeCountMap[type] || 0 })));
+
+  const priorityCounts = db.prepare('SELECT priority, COUNT(*) as count FROM requests GROUP BY priority').all();
+  const priorityCountMap = Object.fromEntries(priorityCounts.map((r) => [r.priority, r.count]));
+  const priorityBreakdown = withBarPercentages(
+    VALID_PRIORITIES.map((priority) => ({ priority, count: priorityCountMap[priority] || 0 }))
+  );
+
+  // last 14 days including today, computed in UTC to match SQLite's
+  // datetime('now')/date('now') — gaps are filled with 0 so a quiet day
+  // shows as an empty bar rather than vanishing from the trend entirely
+  const volumeRows = db
+    .prepare(
+      "SELECT date(created_at) as day, COUNT(*) as count FROM requests WHERE date(created_at) >= date('now', '-13 days') GROUP BY day"
+    )
+    .all();
+  const volumeMap = Object.fromEntries(volumeRows.map((r) => [r.day, r.count]));
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    const day = d.toISOString().slice(0, 10);
+    days.push({ day, count: volumeMap[day] || 0 });
+  }
+  const volumeTrend = withBarPercentages(days);
+
+  res.render('analytics', {
+    title: 'Analytics',
+    name: req.user.name,
+    role: req.user.role,
+    stats,
+    resolutionRate,
+    avgResolutionLabel,
+    typeBreakdown,
+    priorityBreakdown,
+    volumeTrend,
+    PRIORITY_LABELS,
+  });
+});
+
 app.post('/requests/:id/status', requireAdmin, (req, res) => {
   const { status, priority, admin_notes } = req.body;
 
@@ -377,9 +457,19 @@ app.post('/requests/:id/status', requireAdmin, (req, res) => {
       return { changed: false };
     }
 
+    // resolved_at: set the first time a request becomes 'resolved', cleared
+    // if it's reopened, and left alone if it's already resolved and just
+    // being re-saved (e.g. a notes edit) — so that doesn't reset the clock.
     db.prepare(
-      "UPDATE requests SET status = ?, priority = ?, assigned_to = ?, admin_notes = ?, updated_at = datetime('now') WHERE id = ?"
-    ).run(status, priority, assignedTo, trimmedNotes, requestId);
+      `UPDATE requests
+       SET status = ?, priority = ?, assigned_to = ?, admin_notes = ?, updated_at = datetime('now'),
+           resolved_at = CASE
+             WHEN ? = 'resolved' AND resolved_at IS NULL THEN datetime('now')
+             WHEN ? != 'resolved' THEN NULL
+             ELSE resolved_at
+           END
+       WHERE id = ?`
+    ).run(status, priority, assignedTo, trimmedNotes, status, status, requestId);
 
     const lookupName = (id) => (id ? db.prepare('SELECT name FROM users WHERE id = ?').get(id)?.name : null);
     const messages = buildActivityMessages(oldRow, {

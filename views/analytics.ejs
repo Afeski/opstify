@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <div class="page-header">
+      <div>
+        <h1>Analytics</h1>
+        <p class="muted">Request volume, breakdowns, and resolution time across the org</p>
+      </div>
+    </div>
+
+    <div class="stats-grid">
+      <div class="stat-card stat-card--total">
+        <p class="stat-value"><%= stats.total %></p>
+        <p class="stat-label">Total requests</p>
+      </div>
+      <div class="stat-card stat-card--resolved">
+        <p class="stat-value"><%= stats.resolved %></p>
+        <p class="stat-label">Resolved</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-value"><%= resolutionRate %>%</p>
+        <p class="stat-label">Resolution rate</p>
+      </div>
+      <div class="stat-card">
+        <p class="stat-value"><%= avgResolutionLabel %></p>
+        <p class="stat-label">Avg. resolution time</p>
+      </div>
+    </div>
+
+    <div class="analytics-grid">
+      <div class="card analytics-card">
+        <h2>By type</h2>
+        <div class="bar-list">
+          <% typeBreakdown.forEach(function(row) { %>
+            <div class="bar-row">
+              <span class="bar-label"><%= row.type.replace('_', ' ') %></span>
+              <div class="bar-track"><div class="bar-fill" style="width: <%= row.pct %>%"></div></div>
+              <span class="bar-count"><%= row.count %></span>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+
+      <div class="card analytics-card">
+        <h2>By priority</h2>
+        <div class="bar-list">
+          <% priorityBreakdown.forEach(function(row) { %>
+            <div class="bar-row">
+              <span class="bar-label"><%= PRIORITY_LABELS[row.priority] %></span>
+              <div class="bar-track"><div class="bar-fill bar-fill--<%= row.priority %>" style="width: <%= row.pct %>%"></div></div>
+              <span class="bar-count"><%= row.count %></span>
+            </div>
+          <% }); %>
+        </div>
+      </div>
+    </div>
+
+    <div class="card analytics-card">
+      <h2>Requests submitted, last 14 days</h2>
+      <div class="trend-chart">
+        <% volumeTrend.forEach(function(v) { %>
+          <div class="trend-bar-wrap" title="<%= v.day %>: <%= v.count %> request<%= v.count === 1 ? '' : 's' %>">
+            <div class="trend-bar" style="height: <%= v.pct %>%"></div>
+            <span class="trend-day"><%= v.day.slice(5) %></span>
+          </div>
+        <% }); %>
+      </div>
+    </div>
+  </main>
+  </div>
+</body>
+</html>

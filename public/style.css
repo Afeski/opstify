@@ -132,6 +132,7 @@ a:hover {
   color: var(--color-text);
   font-size: 0.9rem;
   font-weight: 500;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 
 .sidebar-link:hover {
@@ -176,6 +177,7 @@ a:hover {
   min-width: 0;
   max-width: 1000px;
   padding: var(--space-3);
+  background: linear-gradient(180deg, var(--color-brand-soft), transparent 200px);
 }
 
 /* below this width, the sidebar collapses into a horizontal top bar
@@ -488,6 +490,12 @@ a:hover {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   padding: var(--space-2);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
 .stat-card--open {
@@ -572,16 +580,56 @@ form {
 }
 
 .filter-bar {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-1);
   max-width: none;
-  margin-bottom: var(--space-2);
+  margin: var(--space-2) 0 var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  padding: var(--space-2);
 }
 
-.filter-bar input[type="text"] {
+.filter-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.filter-controls select {
+  flex: 0 1 auto;
+  padding: 0.4rem 0.5rem;
+  font-size: 0.85rem;
+}
+
+.filter-controls a {
+  font-size: 0.85rem;
+  margin-left: auto;
+}
+
+.search-input {
+  display: flex;
   flex: 1;
-  min-width: 200px;
+  min-width: 260px;
+}
+
+.search-input input[type="text"] {
+  flex: 1;
+  border-right: none;
+  border-radius: var(--radius) 0 0 var(--radius);
+}
+
+.search-input input[type="text"]:focus {
+  position: relative;
+  z-index: 1;
+}
+
+.search-input button {
+  border-radius: 0 var(--radius) var(--radius) 0;
+  white-space: nowrap;
 }
 
 fieldset {
@@ -609,6 +657,14 @@ input, select, textarea, button {
   color: var(--color-text);
 }
 
+input, select, textarea {
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:hover, select:hover, textarea:hover {
+  border-color: var(--color-text-muted);
+}
+
 input:focus, select:focus, textarea:focus {
   outline: 2px solid var(--color-brand);
   outline-offset: 1px;
@@ -622,11 +678,18 @@ button {
   cursor: pointer;
   padding: 0.6rem var(--space-2);
   font-weight: 600;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 button:hover {
   background: var(--color-brand-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+button:active {
+  transform: translateY(0);
+  box-shadow: none;
 }
 
 .button-link {
@@ -637,11 +700,14 @@ button:hover {
   padding: 0.6rem var(--space-2);
   font-weight: 600;
   white-space: nowrap;
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .button-link:hover {
   background: var(--color-brand-hover);
   text-decoration: none;
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
 /* ---------- tables ---------- */
@@ -653,9 +719,17 @@ table {
 
 th, td {
   text-align: left;
-  padding: var(--space-1) var(--space-2);
+  padding: 0.85rem var(--space-2);
   border-bottom: 1px solid var(--color-border);
   vertical-align: top;
+}
+
+tbody tr {
+  transition: background 0.12s ease;
+}
+
+tbody tr:hover {
+  background: var(--color-surface);
 }
 
 tbody tr:last-child td {

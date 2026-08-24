@@ -99,4 +99,21 @@ function migrateAiSuggestion(db) {
 
 migrateAiSuggestion(db);
 
+// Same shape as migrateAiSuggestion, but for the AI-suggested-assignee
+// feature: which admin the AI suggests, and why.
+function migrateAiAssigneeSuggestion(db) {
+  const columns = db.prepare('PRAGMA table_info(requests)').all();
+  const columnNames = columns.map((col) => col.name);
+
+  if (!columnNames.includes('ai_suggested_assignee')) {
+    db.exec('ALTER TABLE requests ADD COLUMN ai_suggested_assignee INTEGER REFERENCES users(id)');
+  }
+
+  if (!columnNames.includes('ai_suggestion_assignee_rationale')) {
+    db.exec('ALTER TABLE requests ADD COLUMN ai_suggestion_assignee_rationale TEXT');
+  }
+}
+
+migrateAiAssigneeSuggestion(db);
+
 module.exports = db;

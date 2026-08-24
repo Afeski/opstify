@@ -147,7 +147,12 @@ const GEMINI_MODEL = 'gemini-3.6-flash';
 // like { priority, rationale } — but a model response is still untrusted
 // input from outside this process, so the priority is re-checked against
 // VALID_PRIORITIES before it's ever returned to a caller.
-async function getAiPrioritySuggestion(description) {
+// Shared plumbing for both AI-suggestion features: builds the request,
+// calls Gemini, and returns the parsed JSON object. Each caller still
+// re-validates the parsed shape itself (a model response is untrusted
+// input, same as anything else from outside this process) — this helper
+// only handles the HTTP/JSON mechanics common to both.
+async function callGeminiJson(promptText, responseSchema) {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
     throw new Error('GEMINI_API_KEY is not set.');
@@ -155,29 +160,10 @@ async function getAiPrioritySuggestion(description) {
 
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
   const body = {
-    contents: [
-      {
-        parts: [
-          {
-            text:
-              'You are triaging an internal PeopleOps request. Based only on the ' +
-              'description below, suggest a priority and a one-sentence rationale.\n\n' +
-              `Priority must be one of: ${VALID_PRIORITIES.join(', ')}.\n\n` +
-              `Description:\n${description}`,
-          },
-        ],
-      },
-    ],
+    contents: [{ parts: [{ text: promptText }] }],
     generationConfig: {
       responseMimeType: 'application/json',
-      responseSchema: {
-        type: 'object',
-        properties: {
-          priority: { type: 'string', enum: VALID_PRIORITIES },
-          rationale: { type: 'string' },
-        },
-        required: ['priority', 'rationale'],
-      },
+      responseSchema,
     },
   };
 
@@ -197,7 +183,25 @@ async function getAiPrioritySuggestion(description) {
     throw new Error('Gemini API returned no content.');
   }
 
-  const parsed = JSON.parse(text);
+  return JSON.parse(text);
+}
+
+async function getAiPrioritySuggestion(description) {
+  const parsed = await callGeminiJson(
+    'You are triaging an internal PeopleOps request. Based only on the ' +
+      'description below, suggest a priority and a one-sentence rationale.\n\n' +
+      `Priority must be one of: ${VALID_PRIORITIES.join(', ')}.\n\n` +
+      `Description:\n${description}`,
+    {
+      type: 'object',
+      properties: {
+        priority: { type: 'string', enum: VALID_PRIORITIES },
+        rationale: { type: 'string' },
+      },
+      required: ['priority', 'rationale'],
+    }
+  );
+
   if (
     !VALID_PRIORITIES.includes(parsed.priority) ||
     typeof parsed.rationale !== 'string' ||
@@ -207,6 +211,45 @@ async function getAiPrioritySuggestion(description) {
   }
 
   return { priority: parsed.priority, rationale: parsed.rationale.trim() };
+}
+
+// admins: [{ id, name, department, job_title, openCount }]. The model picks
+// an admin by id from exactly this list; the returned id is checked against
+// the real list before being trusted (never assume a hallucinated id, or an
+// id outside the set actually offered, is safe to store/use).
+async function getAiAssigneeSuggestion(description, admins) {
+  const adminList = admins
+    .map((a) => {
+      const specialty = [a.job_title, a.department].filter(Boolean).join(', ');
+      return `- id ${a.id}: ${a.name}${specialty ? ` (${specialty})` : ' (no department/job title set)'}, currently has ${a.openCount} open/in-progress request(s) assigned`;
+    })
+    .join('\n');
+
+  const parsed = await callGeminiJson(
+    'You are triaging an internal PeopleOps request and choosing who on the team ' +
+      'should handle it. Based on the description and the admins listed below ' +
+      '(their department/job title when known, and their current workload), pick ' +
+      'the single best-suited admin id and give a one-sentence rationale. When no ' +
+      "admin's specialty clearly matches, prefer whoever has the lightest current " +
+      'workload.\n\n' +
+      `Admins:\n${adminList}\n\n` +
+      `Description:\n${description}`,
+    {
+      type: 'object',
+      properties: {
+        assigneeId: { type: 'integer' },
+        rationale: { type: 'string' },
+      },
+      required: ['assigneeId', 'rationale'],
+    }
+  );
+
+  const matchedAdmin = admins.find((a) => a.id === parsed.assigneeId);
+  if (!matchedAdmin || typeof parsed.rationale !== 'string' || !parsed.rationale.trim()) {
+    throw new Error('Gemini API returned an unexpected shape.');
+  }
+
+  return { assigneeId: matchedAdmin.id, rationale: parsed.rationale.trim() };
 }
 
 const app = express();
@@ -391,10 +434,12 @@ app.get('/requests/:id', (req, res) => {
 
   const request = db
     .prepare(
-      `SELECT requests.*, requester.department, requester.job_title, assignee.name AS assignee_name
+      `SELECT requests.*, requester.department, requester.job_title, assignee.name AS assignee_name,
+              ai_assignee.name AS ai_suggested_assignee_name
        FROM requests
        LEFT JOIN users AS requester ON requester.id = requests.user_id
        LEFT JOIN users AS assignee ON assignee.id = requests.assigned_to
+       LEFT JOIN users AS ai_assignee ON ai_assignee.id = requests.ai_suggested_assignee
        WHERE requests.id = ?`
     )
     .get(req.params.id);
@@ -460,6 +505,41 @@ app.post('/requests/:id/ai-suggest-priority', requireAdmin, async (req, res) => 
     res.redirect(`${detailPath}?flash=${encodeURIComponent('AI suggestion ready.')}`);
   } catch (err) {
     console.error('AI priority suggestion failed:', err.message);
+    res.redirect(`${detailPath}?flash=${encodeURIComponent("Couldn't get an AI suggestion right now.")}`);
+  }
+});
+
+app.post('/requests/:id/ai-suggest-assignee', requireAdmin, async (req, res) => {
+  const request = db.prepare('SELECT id, description FROM requests WHERE id = ?').get(req.params.id);
+  if (!request) {
+    return renderError(res, 404, 'Request not found.');
+  }
+
+  const detailPath = `/requests/${request.id}`;
+
+  try {
+    const workloadRows = db
+      .prepare(
+        "SELECT assigned_to, COUNT(*) as count FROM requests WHERE assigned_to IS NOT NULL AND status != 'resolved' GROUP BY assigned_to"
+      )
+      .all();
+    const workloadMap = Object.fromEntries(workloadRows.map((r) => [r.assigned_to, r.count]));
+    const admins = db
+      .prepare("SELECT id, name, department, job_title FROM users WHERE role = 'admin' ORDER BY name")
+      .all()
+      .map((a) => ({ ...a, openCount: workloadMap[a.id] || 0 }));
+
+    if (admins.length === 0) {
+      throw new Error('No admins available to suggest.');
+    }
+
+    const { assigneeId, rationale } = await getAiAssigneeSuggestion(request.description, admins);
+    db.prepare(
+      'UPDATE requests SET ai_suggested_assignee = ?, ai_suggestion_assignee_rationale = ? WHERE id = ?'
+    ).run(assigneeId, rationale, request.id);
+    res.redirect(`${detailPath}?flash=${encodeURIComponent('AI suggestion ready.')}`);
+  } catch (err) {
+    console.error('AI assignee suggestion failed:', err.message);
     res.redirect(`${detailPath}?flash=${encodeURIComponent("Couldn't get an AI suggestion right now.")}`);
   }
 });

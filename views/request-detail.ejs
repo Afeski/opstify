@@ -81,7 +81,27 @@
           </div>
         <% } else if (geminiEnabled) { %>
           <form method="POST" action="/requests/<%= request.id %>/ai-suggest-priority" class="inline-action">
-            <button type="submit" class="link-button">&#10024; Get AI suggestion</button>
+            <button type="submit" class="link-button">&#10024; Get AI priority suggestion</button>
+          </form>
+        <% } %>
+
+        <% if (request.ai_suggested_assignee) { %>
+          <div class="ai-suggestion">
+            <span>&#10024; AI suggests <strong><%= request.ai_suggested_assignee_name %></strong> &mdash; <%= request.ai_suggestion_assignee_rationale %></span>
+            <% if (request.ai_suggested_assignee !== request.assigned_to) { %>
+              <form method="POST" action="/requests/<%= request.id %>/status" class="inline-action">
+                <input type="hidden" name="next" value="/requests/<%= request.id %>">
+                <input type="hidden" name="status" value="<%= request.status %>">
+                <input type="hidden" name="priority" value="<%= request.priority %>">
+                <input type="hidden" name="admin_notes" value="<%= request.admin_notes || '' %>">
+                <input type="hidden" name="assigned_to" value="<%= request.ai_suggested_assignee %>">
+                <button type="submit" class="link-button">Assign to <%= request.ai_suggested_assignee_name %></button>
+              </form>
+            <% } %>
+          </div>
+        <% } else if (geminiEnabled) { %>
+          <form method="POST" action="/requests/<%= request.id %>/ai-suggest-assignee" class="inline-action">
+            <button type="submit" class="link-button">&#10024; Get AI assignee suggestion</button>
           </form>
         <% } %>
 

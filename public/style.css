@@ -851,6 +851,26 @@ td:nth-child(3) {
   color: var(--color-priority-urgent);
 }
 
+/* ---------- AI suggestion ---------- */
+
+.ai-suggestion {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  flex-wrap: wrap;
+  background: var(--color-brand-soft);
+  border-radius: var(--radius);
+  padding: 0.5rem var(--space-1);
+  margin: var(--space-1) 0;
+  font-size: 0.85rem;
+  color: var(--color-text);
+}
+
+.ai-suggestion strong {
+  color: var(--color-brand);
+}
+
 /* ---------- analytics ---------- */
 
 .analytics-grid {

@@ -1,3 +1,13 @@
+// .env is optional (e.g. a fresh clone before GEMINI_API_KEY is set) — a
+// missing file just means AI features stay disabled, not a startup crash.
+try {
+  process.loadEnvFile('.env');
+} catch (err) {
+  if (err.code !== 'ENOENT') {
+    throw err;
+  }
+}
+
 const express = require('express');
 const session = require('express-session');
 const db = require('./db/database');
@@ -128,6 +138,75 @@ function formatDuration(hours) {
 function withBarPercentages(rows) {
   const max = Math.max(1, ...rows.map((r) => r.count));
   return rows.map((r) => ({ ...r, pct: Math.round((r.count / max) * 100) }));
+}
+
+const GEMINI_MODEL = 'gemini-3.6-flash';
+
+// Calls the Gemini API for a priority suggestion on a request's description.
+// generationConfig.responseSchema constrains the reply to valid JSON shaped
+// like { priority, rationale } — but a model response is still untrusted
+// input from outside this process, so the priority is re-checked against
+// VALID_PRIORITIES before it's ever returned to a caller.
+async function getAiPrioritySuggestion(description) {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not set.');
+  }
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${apiKey}`;
+  const body = {
+    contents: [
+      {
+        parts: [
+          {
+            text:
+              'You are triaging an internal PeopleOps request. Based only on the ' +
+              'description below, suggest a priority and a one-sentence rationale.\n\n' +
+              `Priority must be one of: ${VALID_PRIORITIES.join(', ')}.\n\n` +
+              `Description:\n${description}`,
+          },
+        ],
+      },
+    ],
+    generationConfig: {
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'object',
+        properties: {
+          priority: { type: 'string', enum: VALID_PRIORITIES },
+          rationale: { type: 'string' },
+        },
+        required: ['priority', 'rationale'],
+      },
+    },
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    throw new Error(`Gemini API responded with ${response.status}`);
+  }
+
+  const data = await response.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+  if (!text) {
+    throw new Error('Gemini API returned no content.');
+  }
+
+  const parsed = JSON.parse(text);
+  if (
+    !VALID_PRIORITIES.includes(parsed.priority) ||
+    typeof parsed.rationale !== 'string' ||
+    !parsed.rationale.trim()
+  ) {
+    throw new Error('Gemini API returned an unexpected shape.');
+  }
+
+  return { priority: parsed.priority, rationale: parsed.rationale.trim() };
 }
 
 const app = express();
@@ -344,6 +423,7 @@ app.get('/requests/:id', (req, res) => {
     STATUS_LABELS,
     PRIORITY_LABELS,
     adminUsers,
+    geminiEnabled: !!process.env.GEMINI_API_KEY,
     flash: req.query.flash || null,
   });
 });
@@ -363,6 +443,26 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
+
+app.post('/requests/:id/ai-suggest-priority', requireAdmin, async (req, res) => {
+  const request = db.prepare('SELECT id, description FROM requests WHERE id = ?').get(req.params.id);
+  if (!request) {
+    return renderError(res, 404, 'Request not found.');
+  }
+
+  const detailPath = `/requests/${request.id}`;
+
+  try {
+    const { priority, rationale } = await getAiPrioritySuggestion(request.description);
+    db.prepare(
+      'UPDATE requests SET ai_suggested_priority = ?, ai_suggestion_rationale = ? WHERE id = ?'
+    ).run(priority, rationale, request.id);
+    res.redirect(`${detailPath}?flash=${encodeURIComponent('AI suggestion ready.')}`);
+  } catch (err) {
+    console.error('AI priority suggestion failed:', err.message);
+    res.redirect(`${detailPath}?flash=${encodeURIComponent("Couldn't get an AI suggestion right now.")}`);
+  }
+});
 
 app.get('/analytics', requireAdmin, (req, res) => {
   const statusCounts = db.prepare('SELECT status, COUNT(*) as count FROM requests GROUP BY status').all();

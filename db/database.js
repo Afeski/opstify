@@ -80,4 +80,23 @@ function migrateResolvedAt(db) {
 
 migrateResolvedAt(db);
 
+// Adds the two columns that cache an AI priority suggestion for a request:
+// the suggested value and a one-line rationale. Both are set together by a
+// single request to the Gemini API, so there's no case where one is present
+// without the other.
+function migrateAiSuggestion(db) {
+  const columns = db.prepare('PRAGMA table_info(requests)').all();
+  const columnNames = columns.map((col) => col.name);
+
+  if (!columnNames.includes('ai_suggested_priority')) {
+    db.exec('ALTER TABLE requests ADD COLUMN ai_suggested_priority TEXT');
+  }
+
+  if (!columnNames.includes('ai_suggestion_rationale')) {
+    db.exec('ALTER TABLE requests ADD COLUMN ai_suggestion_rationale TEXT');
+  }
+}
+
+migrateAiSuggestion(db);
+
 module.exports = db;

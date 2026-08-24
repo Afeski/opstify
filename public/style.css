@@ -786,6 +786,12 @@ th {
   color: var(--color-brand-hover);
 }
 
+.link-button:disabled {
+  color: var(--color-text-muted);
+  text-decoration: none;
+  cursor: default;
+}
+
 /* status forms live inside a table cell alongside a badge, so they run
    inline and stay compact rather than using the page-level form layout */
 td form {

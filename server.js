@@ -140,6 +140,51 @@ function withBarPercentages(rows) {
   return rows.map((r) => ({ ...r, pct: Math.round((r.count / max) * 100) }));
 }
 
+// SQLite's datetime('now') stores UTC as "YYYY-MM-DD HH:MM:SS" (no
+// timezone marker). Node's Date constructor treats a space-separated
+// string like that as *local* time, not UTC — replacing the space with
+// "T" and appending "Z" is what actually makes it parse as UTC. Skipping
+// this would silently misreport every duration by this machine's UTC
+// offset.
+function hoursSince(dateStr) {
+  const then = new Date(dateStr.replace(' ', 'T') + 'Z');
+  return (Date.now() - then.getTime()) / 3600000;
+}
+
+function timeAgo(dateStr) {
+  const hours = hoursSince(dateStr);
+  const minutes = Math.floor(hours * 60);
+  if (minutes < 1) {
+    return 'just now';
+  }
+  if (minutes < 60) {
+    return `${minutes} min ago`;
+  }
+  const wholeHours = Math.floor(hours);
+  if (wholeHours < 24) {
+    return `${wholeHours} hr${wholeHours === 1 ? '' : 's'} ago`;
+  }
+  const days = Math.floor(hours / 24);
+  if (days < 7) {
+    return `${days} day${days === 1 ? '' : 's'} ago`;
+  }
+  const weeks = Math.floor(days / 7);
+  return `${weeks} week${weeks === 1 ? '' : 's'} ago`;
+}
+
+// whereClause is appended after "WHERE resolved_at IS NOT NULL" (e.g.
+// "AND user_id = ?"), params are its bound values — lets the same query
+// serve the queue-wide analytics stat and a single user's dashboard stat.
+function getAvgResolutionLabel(whereClause, params) {
+  const row = db
+    .prepare(
+      `SELECT AVG((julianday(resolved_at) - julianday(created_at)) * 24) as avg_hours
+       FROM requests WHERE resolved_at IS NOT NULL ${whereClause}`
+    )
+    .get(...params);
+  return formatDuration(row.avg_hours) || 'No data yet';
+}
+
 const GEMINI_MODEL = 'gemini-3.6-flash';
 
 // Calls the Gemini API for a priority suggestion on a request's description.
@@ -379,6 +424,15 @@ app.get('/dashboard', (req, res) => {
     const statusCounts = db
       .prepare('SELECT status, COUNT(*) as count FROM requests WHERE user_id = ? GROUP BY status')
       .all(req.user.id);
+    const stats = computeStats(statusCounts);
+    stats.newThisWeek = db
+      .prepare("SELECT COUNT(*) as c FROM requests WHERE user_id = ? AND created_at >= datetime('now', '-7 days')")
+      .get(req.user.id).c;
+    stats.openUnassigned = db
+      .prepare("SELECT COUNT(*) as c FROM requests WHERE user_id = ? AND status = 'open' AND assigned_to IS NULL")
+      .get(req.user.id).c;
+    stats.avgResolutionLabel = getAvgResolutionLabel('AND user_id = ?', [req.user.id]);
+
     return res.render('employee-dashboard', {
       title: 'My Requests',
       name: req.user.name,
@@ -386,7 +440,10 @@ app.get('/dashboard', (req, res) => {
       requests,
       STATUS_LABELS,
       PRIORITY_LABELS,
-      stats: computeStats(statusCounts),
+      stats,
+      timeAgo,
+      hoursSince,
+      formatDuration,
       flash,
     });
   }
@@ -411,6 +468,18 @@ app.get('/dashboard', (req, res) => {
   // stats intentionally reflect the whole queue, not the filtered view —
   // they're meant as "overall queue health," not a summary of the search
   const statusCounts = db.prepare('SELECT status, COUNT(*) as count FROM requests GROUP BY status').all();
+  const stats = computeStats(statusCounts);
+  stats.newThisWeek = db
+    .prepare("SELECT COUNT(*) as c FROM requests WHERE created_at >= datetime('now', '-7 days')")
+    .get().c;
+  stats.openUnassigned = db
+    .prepare("SELECT COUNT(*) as c FROM requests WHERE status = 'open' AND assigned_to IS NULL")
+    .get().c;
+  stats.inProgressAssignedToMe = db
+    .prepare("SELECT COUNT(*) as c FROM requests WHERE status = 'in_progress' AND assigned_to = ?")
+    .get(req.user.id).c;
+  stats.avgResolutionLabel = getAvgResolutionLabel('', []);
+
   res.render('admin-dashboard', {
     title: 'All Requests',
     name: req.user.name,
@@ -422,7 +491,10 @@ app.get('/dashboard', (req, res) => {
     adminUsers,
     filters: req.query,
     hasActiveFilters,
-    stats: computeStats(statusCounts),
+    stats,
+    timeAgo,
+    hoursSince,
+    formatDuration,
     flash,
   });
 });
@@ -469,6 +541,9 @@ app.get('/requests/:id', (req, res) => {
     PRIORITY_LABELS,
     adminUsers,
     geminiEnabled: !!process.env.GEMINI_API_KEY,
+    timeAgo,
+    hoursSince,
+    formatDuration,
     flash: req.query.flash || null,
   });
 });
@@ -549,12 +624,7 @@ app.get('/analytics', requireAdmin, (req, res) => {
   const stats = computeStats(statusCounts);
   const resolutionRate = stats.total ? Math.round((stats.resolved / stats.total) * 100) : 0;
 
-  const avgResolutionHours = db
-    .prepare(
-      "SELECT AVG((julianday(resolved_at) - julianday(created_at)) * 24) as avg_hours FROM requests WHERE resolved_at IS NOT NULL"
-    )
-    .get().avg_hours;
-  const avgResolutionLabel = formatDuration(avgResolutionHours) || 'No data yet';
+  const avgResolutionLabel = getAvgResolutionLabel('', []);
 
   // grouped by VALID_TYPES/VALID_PRIORITIES (not just what SQL returns) so a
   // type or priority with zero requests still shows up as a zero-width bar
@@ -587,6 +657,24 @@ app.get('/analytics', requireAdmin, (req, res) => {
   }
   const volumeTrend = withBarPercentages(days);
 
+  // bar width reflects current open workload (the actionable "who's busy"
+  // signal); resolvedCount rides along for context but doesn't affect it
+  const adminWorkloadRows = db
+    .prepare(
+      `SELECT u.id, u.name, u.department, u.job_title,
+              COALESCE(SUM(CASE WHEN r.status != 'resolved' THEN 1 ELSE 0 END), 0) as openCount,
+              COALESCE(SUM(CASE WHEN r.status = 'resolved' THEN 1 ELSE 0 END), 0) as resolvedCount
+       FROM users u
+       LEFT JOIN requests r ON r.assigned_to = u.id
+       WHERE u.role = 'admin'
+       GROUP BY u.id
+       ORDER BY openCount DESC, u.name`
+    )
+    .all();
+  const adminWorkload = withBarPercentages(
+    adminWorkloadRows.map((a) => ({ ...a, count: a.openCount }))
+  );
+
   res.render('analytics', {
     title: 'Analytics',
     name: req.user.name,
@@ -597,6 +685,7 @@ app.get('/analytics', requireAdmin, (req, res) => {
     typeBreakdown,
     priorityBreakdown,
     volumeTrend,
+    adminWorkload,
     PRIORITY_LABELS,
   });
 });

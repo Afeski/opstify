@@ -109,6 +109,11 @@ body {
   color: var(--color-text-muted);
 }
 
+.at-a-glance {
+  font-size: 0.85rem;
+  margin-top: 0.3rem;
+}
+
 h1, h2 {
   font-family: var(--font-display);
 }
@@ -697,6 +702,12 @@ a:hover {
   margin: 0.15rem 0 0;
 }
 
+.stat-sub {
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  margin: 0.4rem 0 0;
+}
+
 .flash {
   background: var(--color-status-resolved-bg);
   color: var(--color-status-resolved);
@@ -1040,6 +1051,15 @@ td:nth-child(3) {
   color: var(--color-priority-urgent);
 }
 
+/* how long a non-resolved request has been sitting — quiet by design, same
+   "don't compete with the badge" treatment as .priority */
+.age-indicator {
+  display: inline-block;
+  margin-left: 0.4rem;
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
 /* ---------- AI suggestion ---------- */
 
 .ai-suggestion {
@@ -1084,6 +1104,15 @@ td:nth-child(3) {
   grid-template-columns: 7rem 1fr 2rem;
   align-items: center;
   gap: var(--space-1);
+}
+
+/* "N open · M done" needs more room than a bare count */
+.bar-list--admin .bar-row {
+  grid-template-columns: 7rem 1fr 6rem;
+}
+
+.bar-list--admin .bar-label {
+  text-transform: none;
 }
 
 .bar-label {

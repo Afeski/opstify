@@ -13,9 +13,14 @@
         <h1>Request #<%= request.id %></h1>
         <p class="muted">
           <%= request.type.replace('_', ' ') %> &middot; submitted by <%= request.requester_name %>
-          <% if (role === 'admin' && (request.department || request.job_title)) { %>
+          <% if (request.department || request.job_title) { %>
             (<%= [request.job_title, request.department].filter(Boolean).join(', ') %>)
           <% } %>
+        </p>
+        <p class="muted at-a-glance">
+          <%= formatDuration(hoursSince(request.created_at)) %> old
+          &middot; updated <%= timeAgo(request.updated_at) %>
+          &middot; <%= activity.length %> activity event<%= activity.length === 1 ? '' : 's' %>
         </p>
       </div>
       <span>

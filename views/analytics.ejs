@@ -57,6 +57,19 @@
           <% }); %>
         </div>
       </div>
+
+      <div class="card analytics-card">
+        <h2>By admin</h2>
+        <div class="bar-list bar-list--admin">
+          <% adminWorkload.forEach(function(a) { %>
+            <div class="bar-row">
+              <span class="bar-label"><%= a.name %></span>
+              <div class="bar-track"><div class="bar-fill" style="width: <%= a.pct %>%"></div></div>
+              <span class="bar-count"><%= a.openCount %> open &middot; <%= a.resolvedCount %> done</span>
+            </div>
+          <% }); %>
+        </div>
+      </div>
     </div>
 
     <div class="card analytics-card">

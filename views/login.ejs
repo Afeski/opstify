@@ -3,8 +3,13 @@
 <%- include('partials/head') %>
 <body class="auth-body">
   <div class="auth-card">
-    <h1>Opstify</h1>
-    <p class="muted">PeopleOps request management</p>
+    <div class="auth-card-header">
+      <div>
+        <h1>Opstify</h1>
+        <p class="muted">PeopleOps request management</p>
+      </div>
+      <button type="button" class="theme-toggle">🌙 Dark mode</button>
+    </div>
 
     <form method="POST" action="/login">
       <label>

@@ -9,6 +9,11 @@
   --color-brand-hover: #4338ca;
   --color-brand-soft: #eef2ff;
   --color-accent: #d946ef;
+  /* R,G,B components of --color-accent, for the one spot (.hero-blob) that
+     needs a custom alpha rather than a fixed token — rgba() can't pull
+     alpha out of a var() that already includes it, so this is kept in sync
+     by hand alongside --color-accent above/below */
+  --color-accent-rgb: 217, 70, 239;
 
   --color-bg: #ffffff;
   --color-surface: #f8fafc;
@@ -47,6 +52,45 @@
      tables, body text) stays on the system stack, since that's what's
      actually best for dense UI readability */
   --font-display: "Space Grotesk", var(--font-sans);
+}
+
+/*
+  Dark palette — same token names as :root, redefined. Every rule in this
+  file reads colors through var(--color-*)/var(--shadow-*), so this block
+  is the entire dark mode implementation; nothing else needs to change.
+  Manually toggled (not prefers-color-scheme driven) — see partials/head.ejs
+  for how [data-theme="dark"] gets set on <html>.
+*/
+[data-theme="dark"] {
+  --color-brand: #6366f1;
+  --color-brand-hover: #818cf8;
+  --color-brand-soft: rgba(99, 102, 241, 0.16);
+  --color-accent: #e879f9;
+  --color-accent-rgb: 232, 121, 249;
+
+  /* cards stay lighter than the page behind them, same relationship as
+     light mode (white card / light-gray page), just inverted */
+  --color-bg: #1e293b;
+  --color-surface: #0f172a;
+  --color-border: #334155;
+  --color-text: #f1f5f9;
+  --color-text-muted: #94a3b8;
+
+  --color-status-open: #fbbf24;
+  --color-status-open-bg: rgba(180, 83, 9, 0.25);
+  --color-status-progress: #60a5fa;
+  --color-status-progress-bg: rgba(29, 78, 216, 0.25);
+  --color-status-resolved: #4ade80;
+  --color-status-resolved-bg: rgba(21, 128, 61, 0.25);
+
+  --color-priority-high: #fb923c;
+  --color-priority-urgent: #f87171;
+
+  /* light mode's shadows are already black-based, just low-opacity — on a
+     near-black page they'd disappear entirely, so dark mode leans on a
+     stronger black shadow instead of inventing a different technique */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4), 0 1px 1px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
 }
 
 * {
@@ -172,6 +216,31 @@ a:hover {
   color: var(--color-text-muted);
 }
 
+/* ---------- theme toggle ---------- */
+/* shared by the sidebar, landing header, and login card — one class, one
+   style, so it reads as the same control wherever it appears */
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+  padding: 0.35rem 0.7rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.theme-toggle:hover {
+  background: var(--color-surface);
+  border-color: var(--color-text-muted);
+  color: var(--color-text);
+}
+
 .page {
   flex: 1;
   min-width: 0;
@@ -283,6 +352,12 @@ a:hover {
   padding: var(--space-2);
 }
 
+.landing-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 .hero {
   overflow: hidden;
   padding: var(--space-4) var(--space-2);
@@ -363,7 +438,7 @@ a:hover {
   left: 50%;
   transform: translate(-50%, -50%);
   background: radial-gradient(circle at 30% 30%, var(--color-brand-soft), transparent 65%),
-    radial-gradient(circle at 70% 70%, rgba(217, 70, 239, 0.18), transparent 65%);
+    radial-gradient(circle at 70% 70%, rgba(var(--color-accent-rgb), 0.18), transparent 65%);
   border-radius: 50%;
   z-index: 0;
 }
@@ -454,6 +529,17 @@ a:hover {
   padding: var(--space-3);
   width: 100%;
   max-width: 360px;
+}
+
+.auth-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.auth-card-header .theme-toggle {
+  flex-shrink: 0;
 }
 
 .auth-card h1 {

@@ -4,9 +4,12 @@
 <body class="landing-body">
   <header class="landing-header">
     <span class="brand">Opstify</span>
-    <a href="<%= loggedIn ? '/dashboard' : '/login' %>" class="button-link">
-      <%= loggedIn ? 'Go to Dashboard' : 'Sign In' %>
-    </a>
+    <div class="landing-header-actions">
+      <button type="button" class="theme-toggle">🌙 Dark mode</button>
+      <a href="<%= loggedIn ? '/dashboard' : '/login' %>" class="button-link">
+        <%= loggedIn ? 'Go to Dashboard' : 'Sign In' %>
+      </a>
+    </div>
   </header>
 
   <section class="hero">

@@ -220,6 +220,44 @@ a:hover {
   .page {
     padding: var(--space-2);
   }
+
+  /* the 260px min-width is fine on desktop but can force horizontal
+     overflow once page + card padding eats into a narrow phone screen */
+  .search-input {
+    min-width: 0;
+  }
+
+  /* 14 flex:1 bars would get crushed thin enough that the rotated day
+     labels turn illegible; give each a fixed width and let the row
+     scroll horizontally instead, same fallback the admin table already
+     uses for its own narrow-screen overflow */
+  .trend-chart {
+    overflow-x: auto;
+    justify-content: flex-start;
+  }
+
+  .trend-bar-wrap {
+    flex: 0 0 28px;
+  }
+}
+
+/* phone widths: brand + nav links + user info no longer fit on one row
+   without overflowing, so the nav wraps onto its own full-width row below
+   the brand/user row instead of forcing horizontal scroll on the page */
+@media (max-width: 480px) {
+  .sidebar {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+
+  .sidebar-nav {
+    order: 1;
+    flex-basis: 100%;
+  }
+
+  .nav-role {
+    display: none;
+  }
 }
 
 .page-header {

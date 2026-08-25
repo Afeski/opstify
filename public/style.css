@@ -418,15 +418,63 @@ a:hover {
   max-width: 360px;
 }
 
+.auth-card h1 {
+  font-size: 1.4rem;
+}
+
 .auth-card form {
   max-width: none;
+  gap: var(--space-1);
+}
+
+.auth-card fieldset {
+  flex-direction: row;
+  border: none;
+  padding: 0;
+  gap: 0.5rem;
+}
+
+.auth-card legend {
+  padding: 0;
+  margin-bottom: 0.3rem;
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.auth-card .optional-fields-start {
+  margin-top: 0.4rem;
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--color-border);
+}
+
+.auth-card button {
+  margin-top: var(--space-1);
+  padding: 0.7rem var(--space-2);
+  font-size: 0.95rem;
 }
 
 .radio-option {
+  flex: 1;
   flex-direction: row;
   align-items: center;
+  justify-content: center;
   gap: 0.4rem;
   color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0.6rem;
+  background: var(--color-surface);
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.radio-option:has(input:checked) {
+  border-color: var(--color-brand);
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+  font-weight: 600;
 }
 
 .card + .card {
@@ -558,6 +606,17 @@ a:hover {
 .table-card {
   padding: 0;
   overflow-x: auto;
+}
+
+.request-form {
+  max-width: 560px;
+  gap: var(--space-2);
+}
+
+.request-form button {
+  margin-top: var(--space-1);
+  padding: 0.7rem var(--space-2);
+  font-size: 0.95rem;
 }
 
 .empty-state {

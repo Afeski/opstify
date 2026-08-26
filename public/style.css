@@ -36,6 +36,11 @@
      the status badge for attention in the same row */
   --color-priority-high: #ea580c;
   --color-priority-urgent: #dc2626;
+  /* only urgent priority gets a background tint — this is deliberately the
+     one place priority IS a filled treatment (the dashboard's urgent
+     callout), an exception to the "quiet text, not a pill" rule above,
+     because the whole point of that callout is to stand out */
+  --color-priority-urgent-bg: #fee2e2;
 
   --radius: 8px;
   --radius-lg: 12px;
@@ -85,6 +90,7 @@
 
   --color-priority-high: #fb923c;
   --color-priority-urgent: #f87171;
+  --color-priority-urgent-bg: rgba(153, 27, 27, 0.3);
 
   /* light mode's shadows are already black-based, just low-opacity — on a
      near-black page they'd disappear entirely, so dark mode leans on a
@@ -439,6 +445,24 @@ a:hover {
   padding: 0.75rem var(--space-3);
 }
 
+.hero-actions--portals {
+  margin-bottom: var(--space-1);
+}
+
+/* two portal buttons side by side shouldn't compete equally for attention —
+   the second reads as an outlined variant of the same action, not a
+   lower-priority "secondary" action in the usual sense */
+.hero-cta--secondary {
+  background: transparent;
+  color: var(--color-brand);
+  border: 1px solid var(--color-brand);
+}
+
+.hero-cta--secondary:hover {
+  background: var(--color-brand-soft);
+  color: var(--color-brand);
+}
+
 .hero-secondary {
   color: var(--color-text-muted);
   font-weight: 600;
@@ -752,6 +776,28 @@ a:hover {
     opacity: 0;
     transform: translateY(-8px);
   }
+}
+
+.urgent-callout {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--color-priority-urgent-bg);
+  color: var(--color-priority-urgent);
+  border: 1px solid var(--color-priority-urgent);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-2);
+  margin-bottom: var(--space-2);
+  font-weight: 600;
+  font-size: 0.9rem;
+  animation: slide-fade-in 0.3s ease-out;
+}
+
+.urgent-callout a {
+  color: inherit;
+  text-decoration: underline;
+  margin-left: auto;
+  font-weight: 600;
 }
 
 .error-code {

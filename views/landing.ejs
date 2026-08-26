@@ -22,12 +22,18 @@
           search, prioritize, assign, and resolve them — no more scattered
           email threads.
         </p>
-        <div class="hero-actions">
-          <a href="<%= loggedIn ? '/dashboard' : '/login' %>" class="button-link hero-cta">
-            <%= loggedIn ? 'Go to Dashboard' : 'Sign In to Opstify' %>
-          </a>
+        <% if (loggedIn) { %>
+          <div class="hero-actions">
+            <a href="/dashboard" class="button-link hero-cta">Go to Dashboard</a>
+            <a href="#features" class="hero-secondary">See what's included &darr;</a>
+          </div>
+        <% } else { %>
+          <div class="hero-actions hero-actions--portals">
+            <a href="/login?role=employee" class="button-link hero-cta">Employee Portal</a>
+            <a href="/login?role=admin" class="button-link hero-cta hero-cta--secondary">PeopleOps Portal</a>
+          </div>
           <a href="#features" class="hero-secondary">See what's included &darr;</a>
-        </div>
+        <% } %>
       </div>
 
       <div class="hero-visual">

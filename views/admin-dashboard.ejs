@@ -13,6 +13,13 @@
       </div>
     </div>
 
+    <% if (urgentCount > 0) { %>
+      <div class="urgent-callout">
+        &#128308; <%= urgentCount %> urgent request<%= urgentCount === 1 ? '' : 's' %> need<%= urgentCount === 1 ? 's' : '' %> attention
+        <a href="/dashboard?priority=urgent">View</a>
+      </div>
+    <% } %>
+
     <%- include('partials/stats', { stats }) %>
 
     <form method="GET" action="/dashboard" class="filter-bar">
@@ -52,6 +59,12 @@
           <option value="me" <%= filters.assigned_to === 'me' ? 'selected' : '' %>>Assigned to me</option>
           <% adminUsers.forEach(function(u) { %>
             <option value="<%= u.id %>" <%= filters.assigned_to === String(u.id) ? 'selected' : '' %>><%= u.name %></option>
+          <% }); %>
+        </select>
+
+        <select name="sort">
+          <% Object.keys(SORT_LABELS).forEach(function(key) { %>
+            <option value="<%= key %>" <%= sort === key ? 'selected' : '' %>><%= SORT_LABELS[key] %></option>
           <% }); %>
         </select>
 

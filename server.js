@@ -18,6 +18,23 @@ const STATUS_LABELS = { open: 'Open', in_progress: 'In progress', resolved: 'Res
 const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 const PRIORITY_LABELS = { low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent' };
 
+// Maps a whitelisted ?sort= value to a literal ORDER BY clause — never
+// built from raw user input, so this stays safe to interpolate directly.
+// "longest_unresolved" is the historical default (non-resolved first,
+// oldest of those first, resolved pushed to the bottom).
+const SORT_OPTIONS = {
+  longest_unresolved: "CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END, created_at ASC",
+  oldest: 'created_at ASC',
+  newest: 'created_at DESC',
+  priority: "CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, created_at ASC",
+};
+const SORT_LABELS = {
+  longest_unresolved: 'Longest unresolved',
+  oldest: 'Oldest first',
+  newest: 'Newest first',
+  priority: 'Highest priority',
+};
+
 function renderError(res, status, message) {
   res.status(status).render('error', { title: `${status} Error`, status, message });
 }
@@ -337,7 +354,11 @@ app.get('/login', (req, res) => {
   if (req.session.userId) {
     return res.redirect('/dashboard');
   }
-  res.render('login', { title: 'Sign In' });
+  // ?role=admin from the landing page's "PeopleOps Portal" button
+  // pre-selects that toggle; anything else (including no param) defaults
+  // to employee, same as the toggle's own default
+  const preselectedRole = req.query.role === 'admin' ? 'admin' : 'employee';
+  res.render('login', { title: 'Sign In', preselectedRole });
 });
 
 app.post('/login', (req, res) => {
@@ -452,6 +473,7 @@ app.get('/dashboard', (req, res) => {
   const { where, params } = buildAdminFilters(req.query, adminUsers, req.user.id);
   const filterKeys = ['q', 'status', 'type', 'priority', 'assigned_to'];
   const hasActiveFilters = filterKeys.some((key) => req.query[key]);
+  const sort = SORT_OPTIONS[req.query.sort] ? req.query.sort : 'longest_unresolved';
 
   const requests = db
     .prepare(`
@@ -460,9 +482,7 @@ app.get('/dashboard', (req, res) => {
       LEFT JOIN users AS requester ON requester.id = requests.user_id
       LEFT JOIN users AS assignee ON assignee.id = requests.assigned_to
       ${where}
-      ORDER BY
-        CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END,
-        created_at ASC
+      ORDER BY ${SORT_OPTIONS[sort]}
     `)
     .all(...params);
   // stats intentionally reflect the whole queue, not the filtered view —
@@ -480,6 +500,10 @@ app.get('/dashboard', (req, res) => {
     .get(req.user.id).c;
   stats.avgResolutionLabel = getAvgResolutionLabel('', []);
 
+  const urgentCount = db
+    .prepare("SELECT COUNT(*) as c FROM requests WHERE priority = 'urgent' AND status != 'resolved'")
+    .get().c;
+
   res.render('admin-dashboard', {
     title: 'All Requests',
     name: req.user.name,
@@ -491,7 +515,10 @@ app.get('/dashboard', (req, res) => {
     adminUsers,
     filters: req.query,
     hasActiveFilters,
+    sort,
+    SORT_LABELS,
     stats,
+    urgentCount,
     timeAgo,
     hoursSince,
     formatDuration,

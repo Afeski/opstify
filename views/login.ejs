@@ -20,11 +20,11 @@
       <fieldset>
         <legend>Role</legend>
         <label class="radio-option">
-          <input type="radio" name="role" value="employee" checked>
+          <input type="radio" name="role" value="employee" <%= preselectedRole === 'employee' ? 'checked' : '' %>>
           Employee
         </label>
         <label class="radio-option">
-          <input type="radio" name="role" value="admin">
+          <input type="radio" name="role" value="admin" <%= preselectedRole === 'admin' ? 'checked' : '' %>>
           PeopleOps admin
         </label>
       </fieldset>

@@ -252,6 +252,13 @@ a:hover {
   max-width: 1000px;
   padding: var(--space-3);
   background: linear-gradient(180deg, var(--color-brand-soft), transparent 200px);
+  animation: fade-in 0.3s ease-out;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
 }
 
 /* below this width, the sidebar collapses into a horizontal top bar
@@ -378,6 +385,17 @@ a:hover {
   align-items: center;
 }
 
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+}
+
+.hero-copy {
+  animation: fade-up 0.6s ease-out backwards;
+}
+
 .eyebrow {
   color: var(--color-brand);
   font-weight: 700;
@@ -433,6 +451,7 @@ a:hover {
   position: relative;
   display: flex;
   justify-content: center;
+  animation: fade-up 0.6s 0.15s ease-out backwards;
 }
 
 .hero-blob {
@@ -476,6 +495,14 @@ a:hover {
 
 .feature-card {
   text-align: left;
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+
+.feature-card.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 .feature-icon {
@@ -717,6 +744,14 @@ a:hover {
   margin-bottom: var(--space-2);
   font-weight: 600;
   font-size: 0.9rem;
+  animation: slide-fade-in 0.3s ease-out;
+}
+
+@keyframes slide-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
 }
 
 .error-code {
@@ -920,6 +955,26 @@ th, td {
 
 tbody tr {
   transition: background 0.12s ease;
+  animation: row-in 0.25s ease-out backwards;
+}
+
+/* staggered for roughly the first screenful of rows; a table with dozens
+   of rows would take visibly too long to finish if every row waited its
+   turn, so later rows just share row 8's delay */
+tbody tr:nth-child(1) { animation-delay: 0.02s; }
+tbody tr:nth-child(2) { animation-delay: 0.04s; }
+tbody tr:nth-child(3) { animation-delay: 0.06s; }
+tbody tr:nth-child(4) { animation-delay: 0.08s; }
+tbody tr:nth-child(5) { animation-delay: 0.1s; }
+tbody tr:nth-child(6) { animation-delay: 0.12s; }
+tbody tr:nth-child(7) { animation-delay: 0.14s; }
+tbody tr:nth-child(n + 8) { animation-delay: 0.16s; }
+
+@keyframes row-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
 }
 
 tbody tr:hover {
@@ -984,6 +1039,13 @@ th {
   color: var(--color-text-muted);
   text-decoration: none;
   cursor: default;
+  animation: pulse 1.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* status forms live inside a table cell alongside a badge, so they run
@@ -1177,4 +1239,17 @@ td:nth-child(3) {
   color: var(--color-text-muted);
   writing-mode: vertical-rl;
   transform: rotate(180deg);
+}
+
+/* ---------- reduced motion ---------- */
+/* blanket kill-switch: collapses every animation/transition in the file
+   (including future ones) down to effectively instant, rather than
+   maintaining a reduced-motion variant of each rule by hand */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

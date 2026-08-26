@@ -1,21 +1,21 @@
 <div class="stats-grid">
   <div class="stat-card stat-card--total">
-    <p class="stat-value"><%= stats.total %></p>
+    <p class="stat-value stat-value--count"><%= stats.total %></p>
     <p class="stat-label">Total</p>
     <% if (stats.newThisWeek !== undefined) { %><p class="stat-sub">+<%= stats.newThisWeek %> this week</p><% } %>
   </div>
   <div class="stat-card stat-card--open">
-    <p class="stat-value"><%= stats.open %></p>
+    <p class="stat-value stat-value--count"><%= stats.open %></p>
     <p class="stat-label">Open</p>
     <% if (stats.openUnassigned !== undefined) { %><p class="stat-sub"><%= stats.openUnassigned %> unassigned</p><% } %>
   </div>
   <div class="stat-card stat-card--progress">
-    <p class="stat-value"><%= stats.in_progress %></p>
+    <p class="stat-value stat-value--count"><%= stats.in_progress %></p>
     <p class="stat-label">In progress</p>
     <% if (stats.inProgressAssignedToMe !== undefined) { %><p class="stat-sub"><%= stats.inProgressAssignedToMe %> assigned to me</p><% } %>
   </div>
   <div class="stat-card stat-card--resolved">
-    <p class="stat-value"><%= stats.resolved %></p>
+    <p class="stat-value stat-value--count"><%= stats.resolved %></p>
     <p class="stat-label">Resolved</p>
     <% if (stats.avgResolutionLabel) { %><p class="stat-sub">avg <%= stats.avgResolutionLabel %></p><% } %>
   </div>

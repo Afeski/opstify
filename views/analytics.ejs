@@ -14,15 +14,15 @@
 
     <div class="stats-grid">
       <div class="stat-card stat-card--total">
-        <p class="stat-value"><%= stats.total %></p>
+        <p class="stat-value stat-value--count"><%= stats.total %></p>
         <p class="stat-label">Total requests</p>
       </div>
       <div class="stat-card stat-card--resolved">
-        <p class="stat-value"><%= stats.resolved %></p>
+        <p class="stat-value stat-value--count"><%= stats.resolved %></p>
         <p class="stat-label">Resolved</p>
       </div>
       <div class="stat-card">
-        <p class="stat-value"><%= resolutionRate %>%</p>
+        <p class="stat-value stat-value--count"><%= resolutionRate %>%</p>
         <p class="stat-label">Resolution rate</p>
       </div>
       <div class="stat-card">

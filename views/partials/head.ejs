@@ -19,10 +19,18 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
+  <!-- .feature-card starts hidden in CSS for the scroll-reveal effect below;
+       without JS that reveal never fires, so force it visible here instead
+       of leaving it permanently invisible for no-JS visitors. -->
+  <noscript>
+    <style>.feature-card { opacity: 1; transform: none; }</style>
+  </noscript>
   <!-- Wires up every .theme-toggle button on the page (sidebar, landing
-       header, login card) to flip the theme and persist it. Deferred to
-       DOMContentLoaded even though this script tag is in <head>, since the
-       toggle buttons themselves are rendered further down in the body. -->
+       header, login card) to flip the theme and persist it. Also handles
+       the stat-card count-up and the landing page's feature-card scroll
+       reveal. Deferred to DOMContentLoaded even though this script tag is
+       in <head>, since the elements themselves are rendered further down
+       in the body. -->
   <script>
     document.addEventListener('DOMContentLoaded', function () {
       function isDark() {
@@ -49,6 +57,64 @@
           updateToggleLabels();
         });
       });
+
+      // Stat cards render their real number directly (so a no-JS visitor
+      // just sees the number, never a stuck "0") — this reads that number
+      // back out as the animation target rather than needing it passed
+      // separately. Only .stat-value--count is animated: cards like "Avg.
+      // resolution time" hold a formatted string ("1.7 days"), not a plain
+      // integer, and can't be linearly counted up.
+      var prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      if (!prefersReducedMotion) {
+        document.querySelectorAll('.stat-value--count').forEach(function (el) {
+          var match = el.textContent.match(/^(\d+)(.*)$/);
+          if (!match) {
+            return;
+          }
+          var target = parseInt(match[1], 10);
+          var suffix = match[2];
+          var duration = 600;
+          var start = null;
+          el.textContent = '0' + suffix;
+          function step(timestamp) {
+            if (start === null) {
+              start = timestamp;
+            }
+            var progress = Math.min((timestamp - start) / duration, 1);
+            var eased = 1 - Math.pow(1 - progress, 3);
+            el.textContent = Math.round(eased * target) + suffix;
+            if (progress < 1) {
+              requestAnimationFrame(step);
+            }
+          }
+          requestAnimationFrame(step);
+        });
+      }
+
+      // Landing page feature cards fade/slide into view as they're
+      // scrolled to. No-op on every other page (querySelectorAll just
+      // finds nothing there).
+      var featureCards = document.querySelectorAll('.feature-card');
+      if (featureCards.length && 'IntersectionObserver' in window) {
+        var observer = new IntersectionObserver(
+          function (entries) {
+            entries.forEach(function (entry) {
+              if (entry.isIntersecting) {
+                entry.target.classList.add('is-visible');
+                observer.unobserve(entry.target);
+              }
+            });
+          },
+          { threshold: 0.15 }
+        );
+        featureCards.forEach(function (card) {
+          observer.observe(card);
+        });
+      } else {
+        featureCards.forEach(function (card) {
+          card.classList.add('is-visible');
+        });
+      }
     });
   </script>
 </head>

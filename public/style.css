@@ -52,6 +52,13 @@
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 1px rgba(15, 23, 42, 0.04);
   --shadow-md: 0 4px 16px rgba(15, 23, 42, 0.08);
 
+  /* tuned curves instead of the browser's default ease/ease-out — the
+     curve does more perceptual work than duration does */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  /* controlled overshoot — used sparingly, not the default for everything */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
   --font-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
   /* a real display font for headings/brand — everything else (forms,
      tables, body text) stays on the system stack, since that's what's
@@ -187,7 +194,7 @@ a:hover {
   color: var(--color-text);
   font-size: 0.9rem;
   font-weight: 500;
-  transition: background 0.15s ease, color 0.15s ease;
+  transition: background 0.15s var(--ease-in-out), color 0.15s var(--ease-in-out);
 }
 
 .sidebar-link:hover {
@@ -243,7 +250,7 @@ a:hover {
   font-weight: 600;
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background 0.15s var(--ease-in-out), border-color 0.15s var(--ease-in-out), color 0.15s var(--ease-in-out), transform 0.15s var(--ease-out);
 }
 
 .theme-toggle:hover {
@@ -252,13 +259,18 @@ a:hover {
   color: var(--color-text);
 }
 
+.theme-toggle:active {
+  transform: scale(0.95);
+  transition-duration: 0.08s;
+}
+
 .page {
   flex: 1;
   min-width: 0;
   max-width: 1000px;
   padding: var(--space-3);
   background: linear-gradient(180deg, var(--color-brand-soft), transparent 200px);
-  animation: fade-in 0.3s ease-out;
+  animation: fade-in 0.3s var(--ease-out);
 }
 
 @keyframes fade-in {
@@ -399,7 +411,7 @@ a:hover {
 }
 
 .hero-copy {
-  animation: fade-up 0.6s ease-out backwards;
+  animation: fade-up 0.6s var(--ease-out) backwards;
 }
 
 .eyebrow {
@@ -475,7 +487,7 @@ a:hover {
   position: relative;
   display: flex;
   justify-content: center;
-  animation: fade-up 0.6s 0.15s ease-out backwards;
+  animation: fade-up 0.6s 0.15s var(--ease-out) backwards;
 }
 
 .hero-blob {
@@ -521,7 +533,7 @@ a:hover {
   text-align: left;
   opacity: 0;
   transform: translateY(16px);
-  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  transition: opacity 0.4s var(--ease-out), transform 0.4s var(--ease-out);
 }
 
 .feature-card.is-visible {
@@ -647,7 +659,7 @@ a:hover {
   border-radius: var(--radius);
   padding: 0.6rem;
   background: var(--color-surface);
-  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
+  transition: border-color 0.15s var(--ease-in-out), background 0.15s var(--ease-in-out), color 0.15s var(--ease-in-out);
 }
 
 .radio-option:has(input:checked) {
@@ -718,7 +730,7 @@ a:hover {
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   padding: var(--space-2);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition: transform 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
 }
 
 .stat-card:hover {
@@ -768,7 +780,7 @@ a:hover {
   margin-bottom: var(--space-2);
   font-weight: 600;
   font-size: 0.9rem;
-  animation: slide-fade-in 0.3s ease-out;
+  animation: slide-fade-in 0.3s var(--ease-out);
 }
 
 @keyframes slide-fade-in {
@@ -790,7 +802,7 @@ a:hover {
   margin-bottom: var(--space-2);
   font-weight: 600;
   font-size: 0.9rem;
-  animation: slide-fade-in 0.3s ease-out;
+  animation: slide-fade-in 0.3s var(--ease-out);
 }
 
 .urgent-callout a {
@@ -842,14 +854,19 @@ a:hover {
   gap: 0.6rem;
   color: inherit;
   text-decoration: none;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
-  animation: fade-up 0.3s ease-out backwards;
+  transition: transform 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
+  animation: fade-up 0.3s var(--ease-out) backwards;
 }
 
 .request-card:hover {
   text-decoration: none;
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
+}
+
+.request-card:active {
+  transform: translateY(-2px) scale(0.98);
+  transition-duration: 0.08s;
 }
 
 .request-card:nth-child(1) { animation-delay: 0.02s; }
@@ -1008,7 +1025,7 @@ input, select, textarea, button {
 }
 
 input, select, textarea {
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: border-color 0.15s var(--ease-in-out), box-shadow 0.15s var(--ease-in-out);
 }
 
 input:hover, select:hover, textarea:hover {
@@ -1028,18 +1045,21 @@ button {
   cursor: pointer;
   padding: 0.6rem var(--space-2);
   font-weight: 600;
-  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.15s var(--ease-in-out), transform 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
 }
 
 button:hover {
   background: var(--color-brand-hover);
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.01);
   box-shadow: var(--shadow-sm);
 }
 
+/* an actual press-down, not just a cancel-the-hover reset — the button
+   should feel like it's being pushed, not released, while held */
 button:active {
-  transform: translateY(0);
+  transform: translateY(0) scale(0.97);
   box-shadow: none;
+  transition-duration: 0.08s;
 }
 
 .button-link {
@@ -1050,14 +1070,20 @@ button:active {
   padding: 0.6rem var(--space-2);
   font-weight: 600;
   white-space: nowrap;
-  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  transition: background 0.15s var(--ease-in-out), transform 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
 }
 
 .button-link:hover {
   background: var(--color-brand-hover);
   text-decoration: none;
-  transform: translateY(-1px);
+  transform: translateY(-1px) scale(1.01);
   box-shadow: var(--shadow-sm);
+}
+
+.button-link:active {
+  transform: translateY(0) scale(0.97);
+  box-shadow: none;
+  transition-duration: 0.08s;
 }
 
 /* ---------- tables ---------- */
@@ -1075,8 +1101,8 @@ th, td {
 }
 
 tbody tr {
-  transition: background 0.12s ease;
-  animation: row-in 0.25s ease-out backwards;
+  transition: background 0.12s var(--ease-in-out);
+  animation: row-in 0.25s var(--ease-out) backwards;
 }
 
 /* staggered for roughly the first screenful of rows; a table with dozens
@@ -1149,6 +1175,7 @@ th {
   font-size: 0.8rem;
   text-decoration: underline;
   cursor: pointer;
+  transition: color 0.15s var(--ease-in-out), opacity 0.08s var(--ease-out);
 }
 
 .link-button:hover {
@@ -1156,11 +1183,17 @@ th {
   color: var(--color-brand-hover);
 }
 
+/* opacity, not scale — it's inline text acting as a link, and scaling
+   text down reads as a rendering glitch rather than a press */
+.link-button:active {
+  opacity: 0.7;
+}
+
 .link-button:disabled {
   color: var(--color-text-muted);
   text-decoration: none;
   cursor: default;
-  animation: pulse 1.4s ease-in-out infinite;
+  animation: pulse 1.4s var(--ease-in-out) infinite;
 }
 
 @keyframes pulse {
@@ -1257,6 +1290,19 @@ td:nth-child(3) {
   margin: var(--space-1) 0;
   font-size: 0.85rem;
   color: var(--color-text);
+  /* its own arrival, distinct from the page's generic fade-in — this is
+     one of the few moments in the app that's a direct result of an action
+     the admin just took (clicked, waited on a real API call, got a
+     result), so it should read as arriving because of that, not just
+     being page furniture that was always going to be there */
+  animation: suggestion-in 0.4s var(--ease-spring) backwards;
+}
+
+@keyframes suggestion-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
 }
 
 .ai-suggestion strong {

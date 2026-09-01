@@ -22,38 +22,30 @@
         <a href="/requests/new">Submit your first request</a>
       </div>
     <% } else { %>
-      <div class="card table-card">
-        <table>
-          <thead>
-            <tr>
-              <th>Type</th>
-              <th>Description</th>
-              <th>Status</th>
-              <th>Submitted</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            <% requests.forEach(function(r) { %>
-              <tr>
-                <td class="type-cell"><%= r.type.replace('_', ' ') %></td>
-                <td><%= r.description %></td>
-                <td>
-                  <span class="badge badge-<%= r.status %>"><%= STATUS_LABELS[r.status] %></span>
-                  <% if (r.priority !== 'normal') { %>
-                    <span class="priority priority-<%= r.priority %>">&#9679; <%= PRIORITY_LABELS[r.priority] %></span>
-                  <% } %>
-                  <% if (r.status !== 'resolved') { %>
-                    <span class="age-indicator">open <%= formatDuration(hoursSince(r.created_at)) %></span>
-                  <% } %>
-                  <div class="assignee-info"><%= r.assignee_name ? 'Assigned to ' + r.assignee_name : 'Unassigned' %></div>
-                </td>
-                <td class="muted" title="<%= r.created_at %>"><%= timeAgo(r.created_at) %></td>
-                <td><a href="/requests/<%= r.id %>">View</a></td>
-              </tr>
-            <% }); %>
-          </tbody>
-        </table>
+      <div class="request-card-grid">
+        <% requests.forEach(function(r) { %>
+          <a href="/requests/<%= r.id %>" class="card request-card">
+            <div class="request-card-header">
+              <span class="type-cell"><%= r.type.replace('_', ' ') %></span>
+              <span class="badge badge-<%= r.status %>"><%= STATUS_LABELS[r.status] %></span>
+            </div>
+            <p class="request-card-description"><%= r.description %></p>
+            <% if (r.priority !== 'normal' || r.status !== 'resolved') { %>
+              <div class="request-card-meta">
+                <% if (r.priority !== 'normal') { %>
+                  <span class="priority priority-<%= r.priority %>">&#9679; <%= PRIORITY_LABELS[r.priority] %></span>
+                <% } %>
+                <% if (r.status !== 'resolved') { %>
+                  <span class="age-indicator">open <%= formatDuration(hoursSince(r.created_at)) %></span>
+                <% } %>
+              </div>
+            <% } %>
+            <div class="request-card-footer">
+              <span class="muted"><%= r.assignee_name ? 'Assigned to ' + r.assignee_name : 'Unassigned' %></span>
+              <span class="muted" title="<%= r.created_at %>"><%= timeAgo(r.created_at) %></span>
+            </div>
+          </a>
+        <% }); %>
       </div>
     <% } %>
   </main>

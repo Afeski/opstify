@@ -824,6 +824,81 @@ a:hover {
   overflow-x: auto;
 }
 
+/* ---------- request cards (employee dashboard) ---------- */
+/* the admin dashboard stays a table — it needs to stay dense/scannable and
+   keep inline status/priority/assignee/notes editing that a card per row
+   can't reasonably hold. Cards are for the employee's own, much shorter
+   list of requests. */
+
+.request-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-2);
+}
+
+.request-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  color: inherit;
+  text-decoration: none;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  animation: fade-up 0.3s ease-out backwards;
+}
+
+.request-card:hover {
+  text-decoration: none;
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+}
+
+.request-card:nth-child(1) { animation-delay: 0.02s; }
+.request-card:nth-child(2) { animation-delay: 0.04s; }
+.request-card:nth-child(3) { animation-delay: 0.06s; }
+.request-card:nth-child(4) { animation-delay: 0.08s; }
+.request-card:nth-child(5) { animation-delay: 0.1s; }
+.request-card:nth-child(6) { animation-delay: 0.12s; }
+.request-card:nth-child(7) { animation-delay: 0.14s; }
+.request-card:nth-child(n + 8) { animation-delay: 0.16s; }
+
+.request-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+}
+
+.request-card-description {
+  margin: 0;
+  color: var(--color-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.request-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.request-card-meta .priority,
+.request-card-meta .age-indicator {
+  margin-left: 0;
+}
+
+.request-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1);
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.8rem;
+}
+
 .request-form {
   max-width: 560px;
   gap: var(--space-2);

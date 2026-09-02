@@ -22,6 +22,8 @@ const VALID_ROLES = ['employee', 'admin', 'field_worker'];
 const ROLE_LABELS = { employee: 'Employee', admin: 'PeopleOps admin', field_worker: 'Field worker' };
 const VALID_PERSON_STATUSES = ['active', 'inactive', 'on_leave'];
 const PERSON_STATUS_LABELS = { active: 'Active', inactive: 'Inactive', on_leave: 'On leave' };
+const VALID_CHECKLIST_ITEM_STATUSES = ['todo', 'in_progress', 'done'];
+const CHECKLIST_ITEM_STATUS_LABELS = { todo: 'To do', in_progress: 'In progress', done: 'Done' };
 
 // Maps a whitelisted ?sort= value to a literal ORDER BY clause — never
 // built from raw user input, so this stays safe to interpolate directly.
@@ -729,6 +731,12 @@ app.get('/people/:id', (req, res) => {
     .prepare('SELECT * FROM certifications WHERE user_id = ? ORDER BY expiry_date IS NULL, expiry_date ASC')
     .all(person.id);
 
+  const checklistRows = db
+    .prepare('SELECT * FROM checklists WHERE person_id = ? ORDER BY due_date IS NULL, due_date ASC, created_at DESC')
+    .all(person.id);
+  const itemsByChecklistStmt = db.prepare('SELECT * FROM checklist_items WHERE checklist_id = ? ORDER BY sort_order');
+  const checklists = checklistRows.map((c) => ({ ...c, items: itemsByChecklistStmt.all(c.id) }));
+
   res.render('person-detail', {
     title: person.name,
     name: req.user.name,
@@ -736,11 +744,16 @@ app.get('/people/:id', (req, res) => {
     currentPath: req.path,
     person,
     certifications,
+    checklists,
     canEdit: req.user.role === 'admin',
+    canUpdateChecklists: req.user.role === 'admin' || person.id === req.user.id,
     VALID_ROLES,
     ROLE_LABELS,
     VALID_PERSON_STATUSES,
     PERSON_STATUS_LABELS,
+    VALID_CHECKLIST_ITEM_STATUSES,
+    CHECKLIST_ITEM_STATUS_LABELS,
+    todayDate: new Date().toISOString().slice(0, 10),
     flash: req.query.flash || null,
   });
 });
@@ -1176,6 +1189,167 @@ app.get('/ask/log', requireAdmin, (req, res) => {
     currentPath: req.path,
     queries,
   });
+});
+
+// ---------- onboarding/offboarding checklist templates (admin only) ----------
+
+app.get('/checklists/templates', requireAdmin, (req, res) => {
+  const templates = db.prepare('SELECT * FROM checklist_templates ORDER BY name').all();
+  res.render('checklist-templates', {
+    title: 'Checklist Templates',
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    templates,
+    flash: req.query.flash || null,
+  });
+});
+
+app.get('/checklists/templates/new', requireAdmin, (req, res) => {
+  res.render('checklist-template-form', {
+    title: 'New Checklist Template',
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    template: null,
+    items: [],
+    formAction: '/checklists/templates',
+  });
+});
+
+app.post('/checklists/templates', requireAdmin, (req, res) => {
+  const { name, tasks } = req.body;
+  const taskLines = (tasks || '').split('\n').map((t) => t.trim()).filter(Boolean);
+  if (!name || !name.trim() || taskLines.length === 0) {
+    return renderError(res, 400, 'A name and at least one task are required.');
+  }
+  const createTemplate = db.transaction(() => {
+    const result = db.prepare('INSERT INTO checklist_templates (name, created_by) VALUES (?, ?)').run(name.trim(), req.user.id);
+    const insertItem = db.prepare('INSERT INTO checklist_template_items (template_id, task_text, sort_order) VALUES (?, ?, ?)');
+    taskLines.forEach((text, i) => insertItem.run(result.lastInsertRowid, text, i));
+    return result.lastInsertRowid;
+  });
+  const templateId = createTemplate();
+  res.redirect(`/checklists/templates/${templateId}?flash=${encodeURIComponent('Template created.')}`);
+});
+
+app.get('/checklists/templates/:id', requireAdmin, (req, res) => {
+  const template = db.prepare('SELECT * FROM checklist_templates WHERE id = ?').get(req.params.id);
+  if (!template) {
+    return renderError(res, 404, 'Template not found.');
+  }
+  const items = db.prepare('SELECT * FROM checklist_template_items WHERE template_id = ? ORDER BY sort_order').all(template.id);
+  const people = db.prepare('SELECT id, name, role FROM users ORDER BY name').all();
+  res.render('checklist-template-detail', {
+    title: template.name,
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    template,
+    items,
+    people,
+    ROLE_LABELS,
+    flash: req.query.flash || null,
+  });
+});
+
+app.get('/checklists/templates/:id/edit', requireAdmin, (req, res) => {
+  const template = db.prepare('SELECT * FROM checklist_templates WHERE id = ?').get(req.params.id);
+  if (!template) {
+    return renderError(res, 404, 'Template not found.');
+  }
+  const items = db.prepare('SELECT * FROM checklist_template_items WHERE template_id = ? ORDER BY sort_order').all(template.id);
+  res.render('checklist-template-form', {
+    title: `Edit ${template.name}`,
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    template,
+    items,
+    formAction: `/checklists/templates/${template.id}`,
+  });
+});
+
+app.post('/checklists/templates/:id', requireAdmin, (req, res) => {
+  const template = db.prepare('SELECT id FROM checklist_templates WHERE id = ?').get(req.params.id);
+  if (!template) {
+    return renderError(res, 404, 'Template not found.');
+  }
+  const { name, tasks } = req.body;
+  const taskLines = (tasks || '').split('\n').map((t) => t.trim()).filter(Boolean);
+  if (!name || !name.trim() || taskLines.length === 0) {
+    return renderError(res, 400, 'A name and at least one task are required.');
+  }
+  const updateTemplate = db.transaction(() => {
+    db.prepare('UPDATE checklist_templates SET name = ? WHERE id = ?').run(name.trim(), template.id);
+    db.prepare('DELETE FROM checklist_template_items WHERE template_id = ?').run(template.id);
+    const insertItem = db.prepare('INSERT INTO checklist_template_items (template_id, task_text, sort_order) VALUES (?, ?, ?)');
+    taskLines.forEach((text, i) => insertItem.run(template.id, text, i));
+  });
+  updateTemplate();
+  res.redirect(`/checklists/templates/${template.id}?flash=${encodeURIComponent('Template updated.')}`);
+});
+
+app.post('/checklists/templates/:id/delete', requireAdmin, (req, res) => {
+  const template = db.prepare('SELECT id FROM checklist_templates WHERE id = ?').get(req.params.id);
+  if (!template) {
+    return renderError(res, 404, 'Template not found.');
+  }
+  const deleteTemplate = db.transaction(() => {
+    db.prepare('UPDATE checklists SET template_id = NULL WHERE template_id = ?').run(template.id);
+    db.prepare('DELETE FROM checklist_template_items WHERE template_id = ?').run(template.id);
+    db.prepare('DELETE FROM checklist_templates WHERE id = ?').run(template.id);
+  });
+  deleteTemplate();
+  res.redirect(`/checklists/templates?flash=${encodeURIComponent('Template deleted.')}`);
+});
+
+app.post('/checklists/templates/:id/assign', requireAdmin, (req, res) => {
+  const template = db.prepare('SELECT * FROM checklist_templates WHERE id = ?').get(req.params.id);
+  if (!template) {
+    return renderError(res, 404, 'Template not found.');
+  }
+  const person = db.prepare('SELECT id FROM users WHERE id = ?').get(req.body.person_id);
+  if (!person) {
+    return renderError(res, 400, 'Invalid person.');
+  }
+  const dueDate = req.body.due_date && req.body.due_date.trim() ? req.body.due_date.trim() : null;
+  const assign = db.transaction(() => {
+    const templateItems = db.prepare('SELECT * FROM checklist_template_items WHERE template_id = ? ORDER BY sort_order').all(template.id);
+    const result = db
+      .prepare('INSERT INTO checklists (template_id, person_id, name, due_date, assigned_by) VALUES (?, ?, ?, ?, ?)')
+      .run(template.id, person.id, template.name, dueDate, req.user.id);
+    const insertItem = db.prepare('INSERT INTO checklist_items (checklist_id, task_text, sort_order) VALUES (?, ?, ?)');
+    templateItems.forEach((item) => insertItem.run(result.lastInsertRowid, item.task_text, item.sort_order));
+  });
+  assign();
+  res.redirect(`/people/${person.id}?flash=${encodeURIComponent('Checklist assigned.')}`);
+});
+
+app.post('/checklists/:id/items/:itemId/status', (req, res) => {
+  if (!req.session.userId) {
+    return res.redirect('/login');
+  }
+  const checklist = db.prepare('SELECT id, person_id FROM checklists WHERE id = ?').get(req.params.id);
+  if (!checklist) {
+    return renderError(res, 404, 'Checklist not found.');
+  }
+  const canUpdate = req.user.role === 'admin' || checklist.person_id === req.user.id;
+  if (!canUpdate) {
+    return renderError(res, 403, 'You can only update your own checklist tasks.');
+  }
+  const { status } = req.body;
+  if (!VALID_CHECKLIST_ITEM_STATUSES.includes(status)) {
+    return renderError(res, 400, 'Invalid status.');
+  }
+  const item = db.prepare('SELECT id FROM checklist_items WHERE id = ? AND checklist_id = ?').get(req.params.itemId, checklist.id);
+  if (!item) {
+    return renderError(res, 404, 'Task not found.');
+  }
+  db.prepare(
+    "UPDATE checklist_items SET status = ?, completed_at = CASE WHEN ? = 'done' THEN datetime('now') ELSE NULL END WHERE id = ?"
+  ).run(status, status, item.id);
+  res.redirect(`/people/${checklist.person_id}?flash=${encodeURIComponent('Task updated.')}`);
 });
 
 app.post('/requests/:id/ai-suggest-priority', requireAdmin, async (req, res) => {

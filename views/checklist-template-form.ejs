@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <p><a href="/checklists/templates">&larr; Back to templates</a></p>
+    <div class="page-header">
+      <div>
+        <h1><%= template ? `Edit ${template.name}` : 'New Checklist Template' %></h1>
+      </div>
+    </div>
+
+    <div class="card">
+      <form method="POST" action="<%= formAction %>" class="document-form">
+        <label>
+          Name
+          <input type="text" name="name" required value="<%= template ? template.name : '' %>" placeholder="e.g. Field Worker Onboarding">
+        </label>
+        <label>
+          Tasks <span class="muted">(one per line)</span>
+          <textarea name="tasks" rows="10" required placeholder="Collect ID badge&#10;Set up email account&#10;Review safety SOPs"><%= items.map((i) => i.task_text).join('\n') %></textarea>
+        </label>
+        <button type="submit"><%= template ? 'Save changes' : 'Create template' %></button>
+      </form>
+    </div>
+  </main>
+  </div>
+</body>
+</html>

@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <%- include('partials/flash', { flash }) %>
+    <div class="page-header">
+      <div>
+        <h1>Checklist Templates</h1>
+        <p class="muted">Reusable onboarding/offboarding task lists, ready to assign to anyone</p>
+      </div>
+      <a href="/checklists/templates/new" class="button-link">+ New template</a>
+    </div>
+
+    <% if (templates.length === 0) { %>
+      <div class="empty-state">
+        <p>No templates yet.</p>
+      </div>
+    <% } else { %>
+      <ul class="activity-list">
+        <% templates.forEach(function(t) { %>
+          <li class="activity-item">
+            <p class="activity-detail">
+              <a href="/checklists/templates/<%= t.id %>"><strong><%= t.name %></strong></a>
+            </p>
+            <p class="activity-meta muted">Created <%= t.created_at %></p>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+  </main>
+  </div>
+</body>
+</html>

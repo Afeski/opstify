@@ -93,3 +93,40 @@ CREATE TABLE IF NOT EXISTS query_log (
   found_answer INTEGER NOT NULL,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS checklist_templates (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  created_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS checklist_template_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  template_id INTEGER NOT NULL REFERENCES checklist_templates(id),
+  task_text TEXT NOT NULL,
+  sort_order INTEGER NOT NULL DEFAULT 0
+);
+
+-- an assignment: template_id is kept for reference (nulled out if the
+-- template is later deleted) but name/items are independent snapshots
+-- from the moment of assignment onward — editing the template afterward
+-- must never change a checklist someone's already partway through
+CREATE TABLE IF NOT EXISTS checklists (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  template_id INTEGER REFERENCES checklist_templates(id),
+  person_id INTEGER NOT NULL REFERENCES users(id),
+  name TEXT NOT NULL,
+  due_date TEXT,
+  assigned_by INTEGER REFERENCES users(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE TABLE IF NOT EXISTS checklist_items (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  checklist_id INTEGER NOT NULL REFERENCES checklists(id),
+  task_text TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'todo' CHECK (status IN ('todo', 'in_progress', 'done')),
+  sort_order INTEGER NOT NULL DEFAULT 0,
+  completed_at TEXT
+);

@@ -1127,6 +1127,16 @@ a:hover {
   overflow-x: auto;
 }
 
+.checklist-block + .checklist-block {
+  margin-top: var(--space-3);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--color-border);
+}
+
+.checklist-block select {
+  width: auto;
+}
+
 /* ---------- request cards (employee dashboard) ---------- */
 /* the admin dashboard stays a table — it needs to stay dense/scannable and
    keep inline status/priority/assignee/notes editing that a card per row

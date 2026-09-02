@@ -18,6 +18,7 @@
     <% if (role === 'admin') { %>
       <a href="/analytics" class="sidebar-link <%= currentPath === '/analytics' ? 'active' : '' %>">Analytics</a>
       <a href="/ask/log" class="sidebar-link <%= currentPath === '/ask/log' ? 'active' : '' %>">Query Log</a>
+      <a href="/checklists/templates" class="sidebar-link <%= currentPath.startsWith('/checklists') ? 'active' : '' %>">Checklist Templates</a>
     <% } %>
   </nav>
 

@@ -100,6 +100,44 @@
         </form>
       <% } %>
     </div>
+
+    <div class="card">
+      <h2>Checklists</h2>
+      <% if (checklists.length === 0) { %>
+        <p class="muted">No checklists assigned.</p>
+      <% } else { %>
+        <% checklists.forEach(function(cl) { %>
+          <% var isOverdue = cl.due_date && cl.due_date < todayDate && cl.items.some((i) => i.status !== 'done'); %>
+          <div class="checklist-block">
+            <p class="activity-detail">
+              <strong><%= cl.name %></strong>
+              <% if (cl.due_date) { %>
+                <span class="muted">&mdash; due <%= cl.due_date %></span>
+                <% if (isOverdue) { %><span class="badge badge-open">Overdue</span><% } %>
+              <% } %>
+            </p>
+            <ul class="activity-list">
+              <% cl.items.forEach(function(item) { %>
+                <li class="activity-item">
+                  <p class="activity-detail"><%= item.task_text %></p>
+                  <% if (canUpdateChecklists) { %>
+                    <form method="POST" action="/checklists/<%= cl.id %>/items/<%= item.id %>/status" class="inline-action">
+                      <select name="status" onchange="this.form.submit()">
+                        <% VALID_CHECKLIST_ITEM_STATUSES.forEach(function(s) { %>
+                          <option value="<%= s %>" <%= item.status === s ? 'selected' : '' %>><%= CHECKLIST_ITEM_STATUS_LABELS[s] %></option>
+                        <% }); %>
+                      </select>
+                    </form>
+                  <% } else { %>
+                    <span class="muted"><%= CHECKLIST_ITEM_STATUS_LABELS[item.status] %></span>
+                  <% } %>
+                </li>
+              <% }); %>
+            </ul>
+          </div>
+        <% }); %>
+      <% } %>
+    </div>
   </main>
   </div>
 </body>

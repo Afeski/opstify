@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <%- include('partials/flash', { flash }) %>
+    <p><a href="/checklists/templates">&larr; Back to templates</a></p>
+
+    <div class="page-header">
+      <div>
+        <h1><%= template.name %></h1>
+      </div>
+      <a href="/checklists/templates/<%= template.id %>/edit" class="button-link">Edit</a>
+    </div>
+
+    <div class="card">
+      <h2>Tasks</h2>
+      <ol>
+        <% items.forEach(function(item) { %>
+          <li><%= item.task_text %></li>
+        <% }); %>
+      </ol>
+    </div>
+
+    <div class="card">
+      <h2>Assign to someone</h2>
+      <form method="POST" action="/checklists/templates/<%= template.id %>/assign">
+        <label>
+          Person
+          <select name="person_id" required>
+            <% people.forEach(function(p) { %>
+              <option value="<%= p.id %>"><%= p.name %> (<%= ROLE_LABELS[p.role] %>)</option>
+            <% }); %>
+          </select>
+        </label>
+        <label>
+          Due date <span class="muted">(optional)</span>
+          <input type="date" name="due_date">
+        </label>
+        <button type="submit">Assign checklist</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>Danger zone</h2>
+      <form method="POST" action="/checklists/templates/<%= template.id %>/delete" data-confirm="Delete this template? Existing assignments made from it are not affected.">
+        <button type="submit" class="link-button">Delete this template</button>
+      </form>
+    </div>
+  </main>
+  </div>
+</body>
+</html>

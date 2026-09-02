@@ -34,6 +34,10 @@ const AUDIT_ENTITY_LABELS = {
   checklist: 'Checklist',
 };
 
+// how many days out a certification counts as "expiring soon" on the
+// notification center, vs. still fine to leave alone
+const CERT_EXPIRY_WINDOW_DAYS = 30;
+
 // Maps a whitelisted ?sort= value to a literal ORDER BY clause — never
 // built from raw user input, so this stays safe to interpolate directly.
 // "longest_unresolved" is the historical default (non-resolved first,
@@ -678,6 +682,23 @@ app.get('/dashboard', (req, res) => {
     .prepare("SELECT COUNT(*) as c FROM requests WHERE priority = 'urgent' AND status != 'resolved'")
     .get().c;
 
+  // same two signals as /notifications, but just a count each — the
+  // dashboard callout only needs a number, not the full rows
+  const expiringCertCount = db
+    .prepare(
+      `SELECT COUNT(*) as c FROM certifications
+       WHERE expiry_date IS NOT NULL AND date(expiry_date) <= date('now', '+${CERT_EXPIRY_WINDOW_DAYS} days')`
+    )
+    .get().c;
+  const overdueChecklistCount = db
+    .prepare(
+      `SELECT COUNT(*) as c FROM checklists
+       WHERE due_date IS NOT NULL AND date(due_date) < date('now')
+         AND EXISTS (SELECT 1 FROM checklist_items WHERE checklist_id = checklists.id AND status != 'done')`
+    )
+    .get().c;
+  const notificationCount = expiringCertCount + overdueChecklistCount;
+
   res.render('admin-dashboard', {
     title: 'All Requests',
     name: req.user.name,
@@ -693,6 +714,7 @@ app.get('/dashboard', (req, res) => {
     SORT_LABELS,
     stats,
     urgentCount,
+    notificationCount,
     timeAgo,
     hoursSince,
     formatDuration,
@@ -1338,6 +1360,51 @@ app.get('/audit', requireAdmin, (req, res) => {
     AUDIT_ENTITY_TYPES,
     AUDIT_ENTITY_LABELS,
     query: req.query,
+  });
+});
+
+// ---------- notification center (admin only) ----------
+// no email/push infra in this app — "notifications" means an in-app,
+// live-computed aggregate of things needing attention org-wide, not a
+// stored/delivered notification with its own table
+
+app.get('/notifications', requireAdmin, (req, res) => {
+  const expiringCerts = db
+    .prepare(
+      `SELECT certifications.*, users.id AS person_id, users.name AS person_name,
+              date(expiry_date) < date('now') AS is_expired
+       FROM certifications
+       JOIN users ON users.id = certifications.user_id
+       WHERE expiry_date IS NOT NULL AND date(expiry_date) <= date('now', '+${CERT_EXPIRY_WINDOW_DAYS} days')
+       ORDER BY expiry_date ASC`
+    )
+    .all()
+    .map((cert) => ({
+      ...cert,
+      isExpired: !!cert.is_expired,
+      daysUntilExpiry: Math.ceil((new Date(cert.expiry_date) - new Date()) / (1000 * 60 * 60 * 24)),
+    }));
+
+  const overdueChecklists = db
+    .prepare(
+      `SELECT checklists.*, users.name AS person_name,
+              (SELECT COUNT(*) FROM checklist_items WHERE checklist_id = checklists.id AND status != 'done') AS incomplete_count
+       FROM checklists
+       JOIN users ON users.id = checklists.person_id
+       WHERE due_date IS NOT NULL AND date(due_date) < date('now')
+         AND EXISTS (SELECT 1 FROM checklist_items WHERE checklist_id = checklists.id AND status != 'done')
+       ORDER BY due_date ASC`
+    )
+    .all();
+
+  res.render('notifications', {
+    title: 'Notifications',
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    expiringCerts,
+    overdueChecklists,
+    CERT_EXPIRY_WINDOW_DAYS,
   });
 });
 

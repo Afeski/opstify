@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <div class="page-header">
+      <div>
+        <h1>Notifications</h1>
+        <p class="muted">Everything needing attention across the org, in one place</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Certifications</h2>
+      <% if (expiringCerts.length === 0) { %>
+        <p class="muted">No certifications expired or expiring within <%= CERT_EXPIRY_WINDOW_DAYS %> days.</p>
+      <% } else { %>
+        <ul class="activity-list">
+          <% expiringCerts.forEach(function(cert) { %>
+            <li class="activity-item">
+              <p class="activity-detail">
+                <a href="/people/<%= cert.person_id %>"><%= cert.person_name %></a>
+                &mdash; <%= cert.name %>
+                <span class="badge <%= cert.isExpired ? 'badge-open' : 'badge-in_progress' %>">
+                  <%= cert.isExpired ? 'Expired' : `Expires in ${cert.daysUntilExpiry} day${cert.daysUntilExpiry === 1 ? '' : 's'}` %>
+                </span>
+              </p>
+              <p class="activity-meta muted">Expiry date: <%= cert.expiry_date %></p>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <h2>Overdue checklists</h2>
+      <% if (overdueChecklists.length === 0) { %>
+        <p class="muted">No overdue checklists.</p>
+      <% } else { %>
+        <ul class="activity-list">
+          <% overdueChecklists.forEach(function(cl) { %>
+            <li class="activity-item">
+              <p class="activity-detail">
+                <a href="/people/<%= cl.person_id %>"><%= cl.person_name %></a>
+                &mdash; <%= cl.name %>
+                <span class="badge badge-open"><%= cl.incomplete_count %> task<%= cl.incomplete_count === 1 ? '' : 's' %> incomplete</span>
+              </p>
+              <p class="activity-meta muted">Due: <%= cl.due_date %></p>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+    </div>
+  </main>
+  </div>
+</body>
+</html>

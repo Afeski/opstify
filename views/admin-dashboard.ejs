@@ -20,6 +20,13 @@
       </div>
     <% } %>
 
+    <% if (notificationCount > 0) { %>
+      <div class="urgent-callout">
+        &#128276; <%= notificationCount %> item<%= notificationCount === 1 ? '' : 's' %> need<%= notificationCount === 1 ? 's' : '' %> attention (expiring certs, overdue checklists)
+        <a href="/notifications">View</a>
+      </div>
+    <% } %>
+
     <%- include('partials/stats', { stats }) %>
 
     <form method="GET" action="/dashboard" class="filter-bar">

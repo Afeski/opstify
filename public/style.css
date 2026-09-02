@@ -286,6 +286,26 @@ a:hover {
   .trend-bar-wrap {
     flex: 0 0 28px;
   }
+
+  /* the desktop padding on inputs/selects/buttons (~0.5rem) comes in under
+     the ~44px touch target guidance once you account for line-height — on
+     a mouse-driven desktop that's fine, but the field worker's checklist
+     status control (and every other control here) is a phone-and-thumb
+     interaction, so mobile widths get roomier padding specifically */
+  input, select, textarea, button, .button-link, .sidebar-link {
+    min-height: 2.75rem;
+    padding-top: 0.7rem;
+    padding-bottom: 0.7rem;
+  }
+
+  .radio-option {
+    min-height: 2.75rem;
+  }
+
+  .sidebar-link {
+    display: flex;
+    align-items: center;
+  }
 }
 
 /* phone widths: brand + nav links + user info no longer fit on one row
@@ -1133,8 +1153,26 @@ a:hover {
   border-top: 1px solid var(--color-border);
 }
 
+/* task text and its status control side by side when there's room, each
+   getting its own full-width row when there isn't — this is the field
+   worker's single most-used control, so it needs to read clearly and stay
+   easy to tap even on a narrow phone screen, not just "not broken" */
+.checklist-block .activity-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.checklist-block .activity-detail {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
 .checklist-block select {
   width: auto;
+  flex: 0 0 auto;
 }
 
 /* ---------- request cards (employee dashboard) ---------- */

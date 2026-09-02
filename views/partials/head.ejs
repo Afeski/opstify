@@ -1,17 +1,4 @@
 <head>
-  <!-- Sets the theme before first paint so there's no flash of the wrong
-       theme on load — must run synchronously, before body/CSS render. -->
-  <script>
-    (function () {
-      try {
-        if (localStorage.getItem('theme') === 'dark') {
-          document.documentElement.setAttribute('data-theme', 'dark');
-        }
-      } catch (err) {
-        // localStorage can throw (private browsing, disabled storage) — just stay light
-      }
-    })();
-  </script>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title><%= title %> - Opstify</title>
@@ -25,39 +12,12 @@
   <noscript>
     <style>.feature-card { opacity: 1; transform: none; }</style>
   </noscript>
-  <!-- Wires up every .theme-toggle button on the page (sidebar, landing
-       header, login card) to flip the theme and persist it. Also handles
-       the stat-card count-up and the landing page's feature-card scroll
-       reveal. Deferred to DOMContentLoaded even though this script tag is
-       in <head>, since the elements themselves are rendered further down
-       in the body. -->
+  <!-- Handles the stat-card count-up and the landing page's feature-card
+       scroll reveal. Deferred to DOMContentLoaded even though this script
+       tag is in <head>, since the elements themselves are rendered
+       further down in the body. -->
   <script>
     document.addEventListener('DOMContentLoaded', function () {
-      function isDark() {
-        return document.documentElement.getAttribute('data-theme') === 'dark';
-      }
-      function updateToggleLabels() {
-        document.querySelectorAll('.theme-toggle').forEach(function (btn) {
-          btn.textContent = isDark() ? '☀️ Light mode' : '🌙 Dark mode';
-        });
-      }
-      updateToggleLabels();
-      document.querySelectorAll('.theme-toggle').forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          if (isDark()) {
-            document.documentElement.removeAttribute('data-theme');
-          } else {
-            document.documentElement.setAttribute('data-theme', 'dark');
-          }
-          try {
-            localStorage.setItem('theme', isDark() ? 'dark' : 'light');
-          } catch (err) {
-            // no persistence available — theme still applies for this page view
-          }
-          updateToggleLabels();
-        });
-      });
-
       // Stat cards render their real number directly (so a no-JS visitor
       // just sees the number, never a stuck "0") — this reads that number
       // back out as the animation target rather than needing it passed

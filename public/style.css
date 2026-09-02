@@ -1535,6 +1535,26 @@ td:nth-child(3) {
   color: var(--color-status-resolved);
 }
 
+/* person status — separate class names from the request-status badges
+   above (badge-active/inactive/on_leave vs badge-open/resolved/etc.) even
+   though a couple reuse the same color tokens, since the two are unrelated
+   concepts that happen to share the .badge treatment */
+.badge-active {
+  background: var(--color-status-resolved-bg);
+  color: var(--color-status-resolved);
+}
+
+.badge-on_leave {
+  background: var(--color-status-open-bg);
+  color: var(--color-status-open);
+}
+
+.badge-inactive {
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
 /* ---------- priority indicators ---------- */
 /* only rendered for non-"normal" priorities — the common case stays quiet
    so a Low/High/Urgent marker actually stands out when it does appear */

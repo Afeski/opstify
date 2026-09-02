@@ -30,3 +30,11 @@ CREATE TABLE IF NOT EXISTS request_activity (
   detail TEXT,
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
+
+CREATE TABLE IF NOT EXISTS certifications (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER NOT NULL REFERENCES users(id),
+  name TEXT NOT NULL,
+  expiry_date TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

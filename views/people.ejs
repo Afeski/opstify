@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <%- include('partials/flash', { flash }) %>
+    <div class="page-header">
+      <div>
+        <h1>People</h1>
+        <p class="muted">Staff and field workers across the org</p>
+      </div>
+    </div>
+
+    <form method="GET" action="/people" class="filter-bar">
+      <div class="search-input">
+        <input type="text" name="q" placeholder="Search by name..." value="<%= q || '' %>">
+        <button type="submit">Search</button>
+      </div>
+    </form>
+
+    <% if (people.length === 0) { %>
+      <div class="empty-state">
+        <p><%= q ? 'No one matches that search.' : 'No people yet.' %></p>
+      </div>
+    <% } else { %>
+      <div class="card table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>Department</th>
+              <th>Contact</th>
+              <th>Assigned asset</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% people.forEach(function(p) { %>
+              <tr>
+                <td><%= p.name %></td>
+                <td><%= ROLE_LABELS[p.role] %></td>
+                <td><span class="badge badge-<%= p.status %>"><%= PERSON_STATUS_LABELS[p.status] %></span></td>
+                <td class="muted"><%= [p.job_title, p.department].filter(Boolean).join(' · ') || '—' %></td>
+                <td class="muted"><%= [p.email, p.phone].filter(Boolean).join(' · ') || '—' %></td>
+                <td><%= p.assigned_asset || '—' %></td>
+                <td><a href="/people/<%= p.id %>">View</a></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+
+    <% if (canEdit) { %>
+      <div class="card">
+        <h2>Add a person</h2>
+        <form method="POST" action="/people">
+          <label>
+            Name
+            <input type="text" name="name" required>
+          </label>
+          <label>
+            Role
+            <select name="role" required>
+              <% VALID_ROLES.forEach(function(r) { %>
+                <option value="<%= r %>"><%= ROLE_LABELS[r] %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label>
+            Status
+            <select name="status">
+              <% VALID_PERSON_STATUSES.forEach(function(s) { %>
+                <option value="<%= s %>" <%= s === 'active' ? 'selected' : '' %>><%= PERSON_STATUS_LABELS[s] %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label>
+            Department <span class="muted">(optional)</span>
+            <input type="text" name="department">
+          </label>
+          <label>
+            Job title <span class="muted">(optional)</span>
+            <input type="text" name="job_title">
+          </label>
+          <label>
+            Phone <span class="muted">(optional)</span>
+            <input type="text" name="phone">
+          </label>
+          <label>
+            Email <span class="muted">(optional)</span>
+            <input type="email" name="email">
+          </label>
+          <label>
+            Assigned asset <span class="muted">(optional)</span>
+            <input type="text" name="assigned_asset" placeholder="e.g. Van #12">
+          </label>
+          <button type="submit">Add person</button>
+        </form>
+      </div>
+    <% } %>
+  </main>
+  </div>
+</body>
+</html>

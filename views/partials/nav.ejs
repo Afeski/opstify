@@ -4,9 +4,14 @@
   </div>
 
   <nav class="sidebar-nav">
-    <a href="/dashboard" class="sidebar-link <%= currentPath === '/dashboard' ? 'active' : '' %>">Dashboard</a>
+    <a href="/dashboard" class="sidebar-link <%= currentPath === '/dashboard' ? 'active' : '' %>">
+      <%= role === 'field_worker' ? 'My Profile' : 'Dashboard' %>
+    </a>
     <% if (role === 'employee') { %>
       <a href="/requests/new" class="sidebar-link <%= currentPath === '/requests/new' ? 'active' : '' %>">New request</a>
+    <% } %>
+    <% if (role === 'admin' || role === 'employee') { %>
+      <a href="/people" class="sidebar-link <%= currentPath === '/people' ? 'active' : '' %>">People</a>
     <% } %>
     <% if (role === 'admin') { %>
       <a href="/analytics" class="sidebar-link <%= currentPath === '/analytics' ? 'active' : '' %>">Analytics</a>
@@ -14,7 +19,7 @@
   </nav>
 
   <div class="sidebar-user">
-    <span class="nav-role"><%= role === 'admin' ? 'PeopleOps admin' : 'Employee' %></span>
+    <span class="nav-role"><%= role === 'admin' ? 'PeopleOps admin' : (role === 'field_worker' ? 'Field worker' : 'Employee') %></span>
     <span class="nav-name"><%= name %></span>
     <a href="/logout" class="nav-logout">Sign out</a>
   </div>

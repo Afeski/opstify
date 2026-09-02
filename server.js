@@ -18,15 +18,26 @@ const STATUS_LABELS = { open: 'Open', in_progress: 'In progress', resolved: 'Res
 const VALID_PRIORITIES = ['low', 'normal', 'high', 'urgent'];
 const PRIORITY_LABELS = { low: 'Low', normal: 'Normal', high: 'High', urgent: 'Urgent' };
 
+const VALID_ROLES = ['employee', 'admin', 'field_worker'];
+const ROLE_LABELS = { employee: 'Employee', admin: 'PeopleOps admin', field_worker: 'Field worker' };
+const VALID_PERSON_STATUSES = ['active', 'inactive', 'on_leave'];
+const PERSON_STATUS_LABELS = { active: 'Active', inactive: 'Inactive', on_leave: 'On leave' };
+
 // Maps a whitelisted ?sort= value to a literal ORDER BY clause — never
 // built from raw user input, so this stays safe to interpolate directly.
 // "longest_unresolved" is the historical default (non-resolved first,
 // oldest of those first, resolved pushed to the bottom).
+// Every column is qualified with "requests." — the query these get spliced
+// into joins users (twice), and users now has its own status/created_at
+// columns too (added for the people-records model), so a bare column name
+// here is ambiguous and SQLite errors rather than guessing which table.
 const SORT_OPTIONS = {
-  longest_unresolved: "CASE status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END, created_at ASC",
-  oldest: 'created_at ASC',
-  newest: 'created_at DESC',
-  priority: "CASE priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, created_at ASC",
+  longest_unresolved:
+    "CASE requests.status WHEN 'open' THEN 0 WHEN 'in_progress' THEN 1 ELSE 2 END, requests.created_at ASC",
+  oldest: 'requests.created_at ASC',
+  newest: 'requests.created_at DESC',
+  priority:
+    "CASE requests.priority WHEN 'urgent' THEN 0 WHEN 'high' THEN 1 WHEN 'normal' THEN 2 ELSE 3 END, requests.created_at ASC",
 };
 const SORT_LABELS = {
   longest_unresolved: 'Longest unresolved',
@@ -354,17 +365,16 @@ app.get('/login', (req, res) => {
   if (req.session.userId) {
     return res.redirect('/dashboard');
   }
-  // ?role=admin from the landing page's "PeopleOps Portal" button
-  // pre-selects that toggle; anything else (including no param) defaults
-  // to employee, same as the toggle's own default
-  const preselectedRole = req.query.role === 'admin' ? 'admin' : 'employee';
+  // ?role=admin/field_worker from a landing page portal button pre-selects
+  // that option; anything else (including no param) defaults to employee
+  const preselectedRole = VALID_ROLES.includes(req.query.role) ? req.query.role : 'employee';
   res.render('login', { title: 'Sign In', preselectedRole });
 });
 
 app.post('/login', (req, res) => {
   const { name, role, department, job_title } = req.body;
 
-  if (!name || !name.trim() || !['employee', 'admin'].includes(role)) {
+  if (!name || !name.trim() || !VALID_ROLES.includes(role)) {
     return renderError(res, 400, 'Name and a valid role are required.');
   }
 
@@ -431,6 +441,13 @@ app.get('/dashboard', (req, res) => {
   }
 
   const flash = req.query.flash || null;
+
+  // field workers don't have a request/queue-based dashboard yet (that's
+  // Phase 2 workflow territory) — their own people record is the honest
+  // default view for now, not a placeholder pretending to be more
+  if (req.user.role === 'field_worker') {
+    return res.redirect(`/people/${req.user.id}`);
+  }
 
   if (req.user.role === 'employee') {
     const requests = db
@@ -590,6 +607,177 @@ function requireAdmin(req, res, next) {
   }
   next();
 }
+
+// admins and employees browse the full directory (employees read-only);
+// field workers only ever see their own record, via /people/:id directly
+function requirePeopleDirectoryAccess(req, res, next) {
+  if (!req.session.userId) {
+    return res.redirect('/login');
+  }
+  if (req.user.role === 'field_worker') {
+    return renderError(res, 403, 'Field workers do not have access to the people directory.');
+  }
+  next();
+}
+
+app.get('/people', requirePeopleDirectoryAccess, (req, res) => {
+  const q = (req.query.q || '').trim();
+  const people = q
+    ? db.prepare('SELECT * FROM users WHERE name LIKE ? ORDER BY name').all(`%${q}%`)
+    : db.prepare('SELECT * FROM users ORDER BY name').all();
+
+  res.render('people', {
+    title: 'People',
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    people,
+    q,
+    canEdit: req.user.role === 'admin',
+    VALID_ROLES,
+    ROLE_LABELS,
+    VALID_PERSON_STATUSES,
+    PERSON_STATUS_LABELS,
+    flash: req.query.flash || null,
+  });
+});
+
+app.get('/people/:id', (req, res) => {
+  if (!req.session.userId) {
+    return res.redirect('/login');
+  }
+
+  const person = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
+  // same "404, not 403" convention as requests — don't leak whether a
+  // record exists to someone who isn't allowed to see it
+  const canView =
+    person &&
+    (req.user.role === 'admin' || req.user.role === 'employee' || person.id === req.user.id);
+
+  if (!canView) {
+    return renderError(res, 404, 'Person not found.');
+  }
+
+  const certifications = db
+    .prepare('SELECT * FROM certifications WHERE user_id = ? ORDER BY expiry_date IS NULL, expiry_date ASC')
+    .all(person.id);
+
+  res.render('person-detail', {
+    title: person.name,
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    person,
+    certifications,
+    canEdit: req.user.role === 'admin',
+    VALID_ROLES,
+    ROLE_LABELS,
+    VALID_PERSON_STATUSES,
+    PERSON_STATUS_LABELS,
+    flash: req.query.flash || null,
+  });
+});
+
+app.post('/people', requireAdmin, (req, res) => {
+  const { name, role, department, job_title, status, phone, email, assigned_asset } = req.body;
+
+  if (!name || !name.trim() || !VALID_ROLES.includes(role)) {
+    return renderError(res, 400, 'Name and a valid role are required.');
+  }
+  if (!VALID_PERSON_STATUSES.includes(status)) {
+    return renderError(res, 400, 'Invalid status.');
+  }
+
+  const trimmedName = name.trim();
+  const existing = db.prepare('SELECT id FROM users WHERE name = ? AND role = ?').get(trimmedName, role);
+  if (existing) {
+    // matches the UNIQUE(name, role) constraint — surfacing it as a normal
+    // validation error rather than letting the INSERT throw
+    return renderError(res, 400, 'A person with this name and role already exists.');
+  }
+
+  const result = db
+    .prepare(
+      `INSERT INTO users (name, role, department, job_title, status, phone, email, assigned_asset)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+    )
+    .run(
+      trimmedName,
+      role,
+      department && department.trim() ? department.trim() : null,
+      job_title && job_title.trim() ? job_title.trim() : null,
+      status,
+      phone && phone.trim() ? phone.trim() : null,
+      email && email.trim() ? email.trim() : null,
+      assigned_asset && assigned_asset.trim() ? assigned_asset.trim() : null
+    );
+
+  res.redirect(`/people/${result.lastInsertRowid}?flash=${encodeURIComponent('Person added.')}`);
+});
+
+// name and role are intentionally not editable here — changing them risks
+// colliding with the UNIQUE(name, role) constraint and, more importantly,
+// they're how login re-identifies a returning person; keeping them fixed
+// after creation avoids identity confusion for a small feature-completeness
+// cost (fixable later as its own deliberate decision, not an oversight)
+app.post('/people/:id', requireAdmin, (req, res) => {
+  const person = db.prepare('SELECT id FROM users WHERE id = ?').get(req.params.id);
+  if (!person) {
+    return renderError(res, 404, 'Person not found.');
+  }
+
+  const { department, job_title, status, phone, email, assigned_asset } = req.body;
+
+  if (!VALID_PERSON_STATUSES.includes(status)) {
+    return renderError(res, 400, 'Invalid status.');
+  }
+
+  db.prepare(
+    `UPDATE users SET department = ?, job_title = ?, status = ?, phone = ?, email = ?, assigned_asset = ?
+     WHERE id = ?`
+  ).run(
+    department && department.trim() ? department.trim() : null,
+    job_title && job_title.trim() ? job_title.trim() : null,
+    status,
+    phone && phone.trim() ? phone.trim() : null,
+    email && email.trim() ? email.trim() : null,
+    assigned_asset && assigned_asset.trim() ? assigned_asset.trim() : null,
+    person.id
+  );
+
+  res.redirect(`/people/${person.id}?flash=${encodeURIComponent('Person updated.')}`);
+});
+
+app.post('/people/:id/certifications', requireAdmin, (req, res) => {
+  const person = db.prepare('SELECT id FROM users WHERE id = ?').get(req.params.id);
+  if (!person) {
+    return renderError(res, 404, 'Person not found.');
+  }
+
+  const { name, expiry_date } = req.body;
+  if (!name || !name.trim()) {
+    return renderError(res, 400, 'Certification name is required.');
+  }
+
+  db.prepare('INSERT INTO certifications (user_id, name, expiry_date) VALUES (?, ?, ?)').run(
+    person.id,
+    name.trim(),
+    expiry_date && expiry_date.trim() ? expiry_date.trim() : null
+  );
+
+  res.redirect(`/people/${person.id}?flash=${encodeURIComponent('Certification added.')}`);
+});
+
+app.post('/certifications/:id/delete', requireAdmin, (req, res) => {
+  const cert = db.prepare('SELECT id, user_id FROM certifications WHERE id = ?').get(req.params.id);
+  if (!cert) {
+    return renderError(res, 404, 'Certification not found.');
+  }
+
+  db.prepare('DELETE FROM certifications WHERE id = ?').run(cert.id);
+
+  res.redirect(`/people/${cert.user_id}?flash=${encodeURIComponent('Certification removed.')}`);
+});
 
 app.post('/requests/:id/ai-suggest-priority', requireAdmin, async (req, res) => {
   const request = db.prepare('SELECT id, description FROM requests WHERE id = ?').get(req.params.id);

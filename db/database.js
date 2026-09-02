@@ -116,4 +116,49 @@ function migrateAiAssigneeSuggestion(db) {
 
 migrateAiAssigneeSuggestion(db);
 
+// Adds the field-worker role and the people-record fields (status, contact
+// info, assigned asset). This one's different from every migration above:
+// role's CHECK constraint needs 'field_worker' added to it, and SQLite has
+// no ALTER TABLE for modifying a CHECK constraint. The standard SQLite
+// procedure for this is to rebuild the table — create a new one with the
+// updated definition, copy the data across (explicitly preserving id, so
+// every existing foreign key in requests/request_activity still resolves
+// to the same row), drop the old table, rename the new one into place.
+// foreign_keys is turned off for the swap, per SQLite's own documented
+// recommendation for schema changes on a table other tables reference.
+function migratePeopleFields(db) {
+  const columns = db.prepare('PRAGMA table_info(users)').all();
+  const hasStatus = columns.some((col) => col.name === 'status');
+
+  if (hasStatus) {
+    return;
+  }
+
+  db.exec('PRAGMA foreign_keys = OFF');
+  db.exec(`
+    CREATE TABLE users_new (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      name TEXT NOT NULL,
+      role TEXT NOT NULL CHECK (role IN ('employee', 'admin', 'field_worker')),
+      department TEXT,
+      job_title TEXT,
+      status TEXT NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'on_leave')),
+      phone TEXT,
+      email TEXT,
+      assigned_asset TEXT,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      UNIQUE (name, role)
+    );
+
+    INSERT INTO users_new (id, name, role, department, job_title, created_at)
+      SELECT id, name, role, department, job_title, created_at FROM users;
+
+    DROP TABLE users;
+    ALTER TABLE users_new RENAME TO users;
+  `);
+  db.exec('PRAGMA foreign_keys = ON');
+}
+
+migratePeopleFields(db);
+
 module.exports = db;

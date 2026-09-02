@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <%- include('partials/flash', { flash }) %>
+    <% if (role !== 'field_worker') { %>
+      <p><a href="/people">&larr; Back to people</a></p>
+    <% } %>
+
+    <div class="page-header">
+      <div>
+        <h1><%= person.name %></h1>
+        <p class="muted">
+          <%= ROLE_LABELS[person.role] %>
+          <% if (person.job_title || person.department) { %>
+            &middot; <%= [person.job_title, person.department].filter(Boolean).join(', ') %>
+          <% } %>
+        </p>
+      </div>
+      <span class="badge badge-<%= person.status %>"><%= PERSON_STATUS_LABELS[person.status] %></span>
+    </div>
+
+    <div class="card">
+      <h2>Details</h2>
+      <% if (canEdit) { %>
+        <form method="POST" action="/people/<%= person.id %>">
+          <label>
+            Status
+            <select name="status">
+              <% VALID_PERSON_STATUSES.forEach(function(s) { %>
+                <option value="<%= s %>" <%= person.status === s ? 'selected' : '' %>><%= PERSON_STATUS_LABELS[s] %></option>
+              <% }); %>
+            </select>
+          </label>
+          <label>
+            Department
+            <input type="text" name="department" value="<%= person.department || '' %>">
+          </label>
+          <label>
+            Job title
+            <input type="text" name="job_title" value="<%= person.job_title || '' %>">
+          </label>
+          <label>
+            Phone
+            <input type="text" name="phone" value="<%= person.phone || '' %>">
+          </label>
+          <label>
+            Email
+            <input type="email" name="email" value="<%= person.email || '' %>">
+          </label>
+          <label>
+            Assigned asset
+            <input type="text" name="assigned_asset" value="<%= person.assigned_asset || '' %>" placeholder="e.g. Van #12">
+          </label>
+          <button type="submit">Save changes</button>
+        </form>
+      <% } else { %>
+        <p><strong>Phone:</strong> <%= person.phone || 'Not set' %></p>
+        <p><strong>Email:</strong> <%= person.email || 'Not set' %></p>
+        <p><strong>Assigned asset:</strong> <%= person.assigned_asset || 'None' %></p>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <h2>Certifications</h2>
+      <% if (certifications.length === 0) { %>
+        <p class="muted">No certifications on record.</p>
+      <% } else { %>
+        <ul class="activity-list">
+          <% certifications.forEach(function(cert) { %>
+            <li class="activity-item">
+              <p class="activity-detail">
+                <%= cert.name %>
+                <% if (cert.expiry_date) { %><span class="muted">&mdash; expires <%= cert.expiry_date %></span><% } %>
+              </p>
+              <% if (canEdit) { %>
+                <form method="POST" action="/certifications/<%= cert.id %>/delete" class="inline-action">
+                  <button type="submit" class="link-button">Remove</button>
+                </form>
+              <% } %>
+            </li>
+          <% }); %>
+        </ul>
+      <% } %>
+
+      <% if (canEdit) { %>
+        <form method="POST" action="/people/<%= person.id %>/certifications">
+          <label>
+            Certification name
+            <input type="text" name="name" required placeholder="e.g. Forklift license">
+          </label>
+          <label>
+            Expiry date <span class="muted">(optional)</span>
+            <input type="date" name="expiry_date">
+          </label>
+          <button type="submit">Add certification</button>
+        </form>
+      <% } %>
+    </div>
+  </main>
+  </div>
+</body>
+</html>

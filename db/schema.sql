@@ -130,3 +130,19 @@ CREATE TABLE IF NOT EXISTS checklist_items (
   sort_order INTEGER NOT NULL DEFAULT 0,
   completed_at TEXT
 );
+
+-- generalized cross-resource audit trail, separate from and in addition to
+-- request_activity (which stays as the per-request detail-page timeline) —
+-- every meaningful write across requests/people/documents/checklists lands
+-- here too, so admins have one place to see everything filterable by
+-- actor/date/type
+CREATE TABLE IF NOT EXISTS audit_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor_user_id INTEGER REFERENCES users(id),
+  actor_name TEXT,
+  entity_type TEXT NOT NULL,
+  entity_id INTEGER,
+  action TEXT NOT NULL,
+  detail TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

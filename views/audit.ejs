@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <div class="page-header">
+      <div>
+        <h1>Audit Log</h1>
+        <p class="muted">Every tracked action across requests, people, documents, and checklists</p>
+      </div>
+    </div>
+
+    <form method="GET" action="/audit" class="filter-bar">
+      <div class="filter-controls">
+        <select name="type">
+          <option value="">All types</option>
+          <% AUDIT_ENTITY_TYPES.forEach(function(t) { %>
+            <option value="<%= t %>" <%= query.type === t ? 'selected' : '' %>><%= AUDIT_ENTITY_LABELS[t] %></option>
+          <% }); %>
+        </select>
+
+        <select name="user">
+          <option value="">Anyone</option>
+          <% actors.forEach(function(a) { %>
+            <option value="<%= a.actor_user_id %>" <%= String(query.user) === String(a.actor_user_id) ? 'selected' : '' %>><%= a.actor_name %></option>
+          <% }); %>
+        </select>
+
+        <input type="date" name="from" value="<%= query.from || '' %>">
+        <input type="date" name="to" value="<%= query.to || '' %>">
+
+        <button type="submit">Filter</button>
+        <% if (query.type || query.user || query.from || query.to) { %>
+          <a href="/audit">Clear filters</a>
+        <% } %>
+      </div>
+    </form>
+
+    <% if (entries.length === 0) { %>
+      <div class="empty-state">
+        <p>No matching audit entries.</p>
+      </div>
+    <% } else { %>
+      <ul class="activity-list">
+        <% entries.forEach(function(e) { %>
+          <li class="activity-item">
+            <p class="activity-detail">
+              <span class="badge badge-open"><%= AUDIT_ENTITY_LABELS[e.entity_type] %></span>
+              <%
+                var href = null;
+                if (e.entity_type === 'request') href = '/requests/' + e.entity_id;
+                else if (e.entity_type === 'person') href = '/people/' + e.entity_id;
+                else if (e.entity_type === 'document') href = '/documents/' + e.entity_id;
+                else if (e.entity_type === 'checklist_template') href = '/checklists/templates/' + e.entity_id;
+              %>
+              <% if (href) { %>
+                <a href="<%= href %>"><%= e.detail %></a>
+              <% } else { %>
+                <%= e.detail %>
+              <% } %>
+            </p>
+            <p class="activity-meta muted"><%= e.actor_name || 'Unknown' %> &middot; <%= e.created_at %></p>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+  </main>
+  </div>
+</body>
+</html>

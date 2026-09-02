@@ -25,6 +25,15 @@ const PERSON_STATUS_LABELS = { active: 'Active', inactive: 'Inactive', on_leave:
 const VALID_CHECKLIST_ITEM_STATUSES = ['todo', 'in_progress', 'done'];
 const CHECKLIST_ITEM_STATUS_LABELS = { todo: 'To do', in_progress: 'In progress', done: 'Done' };
 
+const AUDIT_ENTITY_TYPES = ['request', 'person', 'document', 'checklist_template', 'checklist'];
+const AUDIT_ENTITY_LABELS = {
+  request: 'Request',
+  person: 'Person',
+  document: 'Document',
+  checklist_template: 'Checklist template',
+  checklist: 'Checklist',
+};
+
 // Maps a whitelisted ?sort= value to a literal ORDER BY clause — never
 // built from raw user input, so this stays safe to interpolate directly.
 // "longest_unresolved" is the historical default (non-resolved first,
@@ -106,6 +115,42 @@ function buildAdminFilters(query, adminUsers, currentUserId) {
   };
 }
 
+// Same whitelist-only approach as buildAdminFilters — an unrecognized
+// ?type=/?user=/?from=/?to= is silently ignored rather than crashing the
+// query or matching everything. actors is the real set of people who have
+// ever appeared in audit_log (not the full users table), so the filter
+// dropdown only ever offers choices that can actually narrow results.
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+function buildAuditFilters(query, actors) {
+  const conditions = [];
+  const params = [];
+
+  if (AUDIT_ENTITY_TYPES.includes(query.type)) {
+    conditions.push('entity_type = ?');
+    params.push(query.type);
+  }
+
+  if (query.user && actors.some((a) => String(a.actor_user_id) === query.user)) {
+    conditions.push('actor_user_id = ?');
+    params.push(Number(query.user));
+  }
+
+  if (query.from && DATE_ONLY_PATTERN.test(query.from)) {
+    conditions.push('date(created_at) >= ?');
+    params.push(query.from);
+  }
+
+  if (query.to && DATE_ONLY_PATTERN.test(query.to)) {
+    conditions.push('date(created_at) <= ?');
+    params.push(query.to);
+  }
+
+  return {
+    where: conditions.length ? `WHERE ${conditions.join(' AND ')}` : '',
+    params,
+  };
+}
+
 // Compares a request's old field values against the submitted new ones and
 // returns one { action, detail } message per field that actually changed —
 // nothing for fields resubmitted unchanged, so re-clicking "Update" with no
@@ -145,6 +190,48 @@ function buildActivityMessages(oldRow, newValues) {
   }
 
   return messages;
+}
+
+// Compares a person's old field values against the submitted new ones and
+// returns one { action, detail } message per field that actually changed —
+// same "no-op resave logs nothing" behavior as buildActivityMessages above.
+function buildPersonChangeMessages(oldRow, newValues) {
+  const messages = [];
+
+  if (oldRow.status !== newValues.status) {
+    messages.push({
+      action: 'status_changed',
+      detail: `Status changed from ${PERSON_STATUS_LABELS[oldRow.status]} to ${PERSON_STATUS_LABELS[newValues.status]}`,
+    });
+  }
+  if ((oldRow.department || null) !== newValues.department) {
+    messages.push({ action: 'department_changed', detail: `Department changed to ${newValues.department || '(none)'}` });
+  }
+  if ((oldRow.job_title || null) !== newValues.jobTitle) {
+    messages.push({ action: 'job_title_changed', detail: `Job title changed to ${newValues.jobTitle || '(none)'}` });
+  }
+  if ((oldRow.phone || null) !== newValues.phone) {
+    messages.push({ action: 'phone_changed', detail: `Phone changed to ${newValues.phone || '(none)'}` });
+  }
+  if ((oldRow.email || null) !== newValues.email) {
+    messages.push({ action: 'email_changed', detail: `Email changed to ${newValues.email || '(none)'}` });
+  }
+  if ((oldRow.assigned_asset || null) !== newValues.assignedAsset) {
+    messages.push({ action: 'assigned_asset_changed', detail: `Assigned asset changed to ${newValues.assignedAsset || '(none)'}` });
+  }
+
+  return messages;
+}
+
+// Generalized cross-resource audit trail — see audit_log in schema.sql.
+// Called directly (not its own db.transaction()): better-sqlite3 statements
+// run fine nested inside an existing outer transaction, so this composes
+// with the transactions already wrapping most of the call sites below.
+const insertAuditLog = db.prepare(
+  'INSERT INTO audit_log (actor_user_id, actor_name, entity_type, entity_id, action, detail) VALUES (?, ?, ?, ?, ?, ?)'
+);
+function logAudit(req, entityType, entityId, action, detail) {
+  insertAuditLog.run(req.user.id, req.user.name, entityType, entityId, action, detail);
 }
 
 // Formats a duration given in hours the way a human would read it: under a
@@ -500,6 +587,7 @@ app.post('/requests', requireEmployee, (req, res) => {
   db.prepare(
     'INSERT INTO request_activity (request_id, actor_user_id, actor_name, action, detail) VALUES (?, ?, ?, ?, ?)'
   ).run(result.lastInsertRowid, req.user.id, req.user.name, 'submitted', 'Request submitted');
+  logAudit(req, 'request', result.lastInsertRowid, 'submitted', 'Request submitted');
 
   res.redirect('/dashboard?flash=' + encodeURIComponent('Request submitted.'));
 });
@@ -792,6 +880,8 @@ app.post('/people', requireAdmin, (req, res) => {
       assigned_asset && assigned_asset.trim() ? assigned_asset.trim() : null
     );
 
+  logAudit(req, 'person', result.lastInsertRowid, 'created', `Added ${trimmedName} (${ROLE_LABELS[role]})`);
+
   res.redirect(`/people/${result.lastInsertRowid}?flash=${encodeURIComponent('Person added.')}`);
 });
 
@@ -801,31 +891,57 @@ app.post('/people', requireAdmin, (req, res) => {
 // after creation avoids identity confusion for a small feature-completeness
 // cost (fixable later as its own deliberate decision, not an oversight)
 app.post('/people/:id', requireAdmin, (req, res) => {
-  const person = db.prepare('SELECT id FROM users WHERE id = ?').get(req.params.id);
-  if (!person) {
-    return renderError(res, 404, 'Person not found.');
-  }
-
   const { department, job_title, status, phone, email, assigned_asset } = req.body;
 
   if (!VALID_PERSON_STATUSES.includes(status)) {
     return renderError(res, 400, 'Invalid status.');
   }
 
-  db.prepare(
-    `UPDATE users SET department = ?, job_title = ?, status = ?, phone = ?, email = ?, assigned_asset = ?
-     WHERE id = ?`
-  ).run(
-    department && department.trim() ? department.trim() : null,
-    job_title && job_title.trim() ? job_title.trim() : null,
+  const newValues = {
     status,
-    phone && phone.trim() ? phone.trim() : null,
-    email && email.trim() ? email.trim() : null,
-    assigned_asset && assigned_asset.trim() ? assigned_asset.trim() : null,
-    person.id
-  );
+    department: department && department.trim() ? department.trim() : null,
+    jobTitle: job_title && job_title.trim() ? job_title.trim() : null,
+    phone: phone && phone.trim() ? phone.trim() : null,
+    email: email && email.trim() ? email.trim() : null,
+    assignedAsset: assigned_asset && assigned_asset.trim() ? assigned_asset.trim() : null,
+  };
 
-  res.redirect(`/people/${person.id}?flash=${encodeURIComponent('Person updated.')}`);
+  // fetch-then-diff-then-log, atomically — same pattern as the request
+  // status-update route: the diff depends on the pre-update row, so the
+  // fetch and the update have to happen together
+  const updateAndLog = db.transaction((personId) => {
+    const oldRow = db.prepare('SELECT * FROM users WHERE id = ?').get(personId);
+    if (!oldRow) {
+      return { changed: false };
+    }
+
+    db.prepare(
+      `UPDATE users SET department = ?, job_title = ?, status = ?, phone = ?, email = ?, assigned_asset = ?
+       WHERE id = ?`
+    ).run(
+      newValues.department,
+      newValues.jobTitle,
+      newValues.status,
+      newValues.phone,
+      newValues.email,
+      newValues.assignedAsset,
+      personId
+    );
+
+    const messages = buildPersonChangeMessages(oldRow, newValues);
+    for (const message of messages) {
+      logAudit(req, 'person', personId, message.action, message.detail);
+    }
+
+    return { changed: true };
+  });
+
+  const result = updateAndLog(req.params.id);
+  if (!result.changed) {
+    return renderError(res, 404, 'Person not found.');
+  }
+
+  res.redirect(`/people/${req.params.id}?flash=${encodeURIComponent('Person updated.')}`);
 });
 
 app.post('/people/:id/certifications', requireAdmin, (req, res) => {
@@ -839,22 +955,25 @@ app.post('/people/:id/certifications', requireAdmin, (req, res) => {
     return renderError(res, 400, 'Certification name is required.');
   }
 
+  const trimmedCertName = name.trim();
   db.prepare('INSERT INTO certifications (user_id, name, expiry_date) VALUES (?, ?, ?)').run(
     person.id,
-    name.trim(),
+    trimmedCertName,
     expiry_date && expiry_date.trim() ? expiry_date.trim() : null
   );
+  logAudit(req, 'person', person.id, 'certification_added', `Added certification: ${trimmedCertName}`);
 
   res.redirect(`/people/${person.id}?flash=${encodeURIComponent('Certification added.')}`);
 });
 
 app.post('/certifications/:id/delete', requireAdmin, (req, res) => {
-  const cert = db.prepare('SELECT id, user_id FROM certifications WHERE id = ?').get(req.params.id);
+  const cert = db.prepare('SELECT id, user_id, name FROM certifications WHERE id = ?').get(req.params.id);
   if (!cert) {
     return renderError(res, 404, 'Certification not found.');
   }
 
   db.prepare('DELETE FROM certifications WHERE id = ?').run(cert.id);
+  logAudit(req, 'person', cert.user_id, 'certification_removed', `Removed certification: ${cert.name}`);
 
   res.redirect(`/people/${cert.user_id}?flash=${encodeURIComponent('Certification removed.')}`);
 });
@@ -933,9 +1052,11 @@ app.post('/documents', requireAdmin, (req, res) => {
     return renderError(res, 400, 'Title, category, and content are required.');
   }
 
+  const trimmedTitle = title.trim();
   const result = db
     .prepare('INSERT INTO documents (title, category, content, created_by) VALUES (?, ?, ?, ?)')
-    .run(title.trim(), category.trim(), content.trim(), req.user.id);
+    .run(trimmedTitle, category.trim(), content.trim(), req.user.id);
+  logAudit(req, 'document', result.lastInsertRowid, 'created', `Created "${trimmedTitle}"`);
 
   res.redirect(`/documents/${result.lastInsertRowid}?flash=${encodeURIComponent('Document created.')}`);
 });
@@ -1031,6 +1152,7 @@ app.post('/documents/:id', requireAdmin, (req, res) => {
     db.prepare(
       "UPDATE documents SET title = ?, category = ?, content = ?, updated_at = datetime('now') WHERE id = ?"
     ).run(title.trim(), category.trim(), content.trim(), docId);
+    logAudit(req, 'document', docId, 'updated', `Updated "${title.trim()}"`);
 
     return { changed: true };
   });
@@ -1044,7 +1166,7 @@ app.post('/documents/:id', requireAdmin, (req, res) => {
 });
 
 app.post('/documents/:id/delete', requireAdmin, (req, res) => {
-  const document = db.prepare('SELECT id FROM documents WHERE id = ?').get(req.params.id);
+  const document = db.prepare('SELECT id, title FROM documents WHERE id = ?').get(req.params.id);
   if (!document) {
     return renderError(res, 404, 'Document not found.');
   }
@@ -1055,6 +1177,7 @@ app.post('/documents/:id/delete', requireAdmin, (req, res) => {
   const deleteDocAndVersions = db.transaction((docId) => {
     db.prepare('DELETE FROM document_versions WHERE document_id = ?').run(docId);
     db.prepare('DELETE FROM documents WHERE id = ?').run(docId);
+    logAudit(req, 'document', docId, 'deleted', `Deleted "${document.title}"`);
   });
   deleteDocAndVersions(document.id);
 
@@ -1191,6 +1314,33 @@ app.get('/ask/log', requireAdmin, (req, res) => {
   });
 });
 
+// ---------- cross-resource audit trail (admin only) ----------
+// see audit_log in schema.sql and logAudit() above — every write point
+// across requests/people/documents/checklists dual-writes here
+
+app.get('/audit', requireAdmin, (req, res) => {
+  const actors = db
+    .prepare('SELECT DISTINCT actor_user_id, actor_name FROM audit_log ORDER BY actor_name')
+    .all();
+
+  const { where, params } = buildAuditFilters(req.query, actors);
+  const entries = db
+    .prepare(`SELECT * FROM audit_log ${where} ORDER BY created_at DESC, id DESC LIMIT 200`)
+    .all(...params);
+
+  res.render('audit', {
+    title: 'Audit Log',
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    entries,
+    actors,
+    AUDIT_ENTITY_TYPES,
+    AUDIT_ENTITY_LABELS,
+    query: req.query,
+  });
+});
+
 // ---------- onboarding/offboarding checklist templates (admin only) ----------
 
 app.get('/checklists/templates', requireAdmin, (req, res) => {
@@ -1223,10 +1373,12 @@ app.post('/checklists/templates', requireAdmin, (req, res) => {
   if (!name || !name.trim() || taskLines.length === 0) {
     return renderError(res, 400, 'A name and at least one task are required.');
   }
+  const trimmedTemplateName = name.trim();
   const createTemplate = db.transaction(() => {
-    const result = db.prepare('INSERT INTO checklist_templates (name, created_by) VALUES (?, ?)').run(name.trim(), req.user.id);
+    const result = db.prepare('INSERT INTO checklist_templates (name, created_by) VALUES (?, ?)').run(trimmedTemplateName, req.user.id);
     const insertItem = db.prepare('INSERT INTO checklist_template_items (template_id, task_text, sort_order) VALUES (?, ?, ?)');
     taskLines.forEach((text, i) => insertItem.run(result.lastInsertRowid, text, i));
+    logAudit(req, 'checklist_template', result.lastInsertRowid, 'created', `Created template "${trimmedTemplateName}"`);
     return result.lastInsertRowid;
   });
   const templateId = createTemplate();
@@ -1280,18 +1432,20 @@ app.post('/checklists/templates/:id', requireAdmin, (req, res) => {
   if (!name || !name.trim() || taskLines.length === 0) {
     return renderError(res, 400, 'A name and at least one task are required.');
   }
+  const trimmedTemplateName = name.trim();
   const updateTemplate = db.transaction(() => {
-    db.prepare('UPDATE checklist_templates SET name = ? WHERE id = ?').run(name.trim(), template.id);
+    db.prepare('UPDATE checklist_templates SET name = ? WHERE id = ?').run(trimmedTemplateName, template.id);
     db.prepare('DELETE FROM checklist_template_items WHERE template_id = ?').run(template.id);
     const insertItem = db.prepare('INSERT INTO checklist_template_items (template_id, task_text, sort_order) VALUES (?, ?, ?)');
     taskLines.forEach((text, i) => insertItem.run(template.id, text, i));
+    logAudit(req, 'checklist_template', template.id, 'updated', `Updated template "${trimmedTemplateName}"`);
   });
   updateTemplate();
   res.redirect(`/checklists/templates/${template.id}?flash=${encodeURIComponent('Template updated.')}`);
 });
 
 app.post('/checklists/templates/:id/delete', requireAdmin, (req, res) => {
-  const template = db.prepare('SELECT id FROM checklist_templates WHERE id = ?').get(req.params.id);
+  const template = db.prepare('SELECT id, name FROM checklist_templates WHERE id = ?').get(req.params.id);
   if (!template) {
     return renderError(res, 404, 'Template not found.');
   }
@@ -1299,6 +1453,7 @@ app.post('/checklists/templates/:id/delete', requireAdmin, (req, res) => {
     db.prepare('UPDATE checklists SET template_id = NULL WHERE template_id = ?').run(template.id);
     db.prepare('DELETE FROM checklist_template_items WHERE template_id = ?').run(template.id);
     db.prepare('DELETE FROM checklist_templates WHERE id = ?').run(template.id);
+    logAudit(req, 'checklist_template', template.id, 'deleted', `Deleted template "${template.name}"`);
   });
   deleteTemplate();
   res.redirect(`/checklists/templates?flash=${encodeURIComponent('Template deleted.')}`);
@@ -1309,7 +1464,7 @@ app.post('/checklists/templates/:id/assign', requireAdmin, (req, res) => {
   if (!template) {
     return renderError(res, 404, 'Template not found.');
   }
-  const person = db.prepare('SELECT id FROM users WHERE id = ?').get(req.body.person_id);
+  const person = db.prepare('SELECT id, name FROM users WHERE id = ?').get(req.body.person_id);
   if (!person) {
     return renderError(res, 400, 'Invalid person.');
   }
@@ -1321,6 +1476,7 @@ app.post('/checklists/templates/:id/assign', requireAdmin, (req, res) => {
       .run(template.id, person.id, template.name, dueDate, req.user.id);
     const insertItem = db.prepare('INSERT INTO checklist_items (checklist_id, task_text, sort_order) VALUES (?, ?, ?)');
     templateItems.forEach((item) => insertItem.run(result.lastInsertRowid, item.task_text, item.sort_order));
+    logAudit(req, 'checklist', result.lastInsertRowid, 'assigned', `Assigned "${template.name}" to ${person.name}`);
   });
   assign();
   res.redirect(`/people/${person.id}?flash=${encodeURIComponent('Checklist assigned.')}`);
@@ -1342,13 +1498,14 @@ app.post('/checklists/:id/items/:itemId/status', (req, res) => {
   if (!VALID_CHECKLIST_ITEM_STATUSES.includes(status)) {
     return renderError(res, 400, 'Invalid status.');
   }
-  const item = db.prepare('SELECT id FROM checklist_items WHERE id = ? AND checklist_id = ?').get(req.params.itemId, checklist.id);
+  const item = db.prepare('SELECT id, task_text FROM checklist_items WHERE id = ? AND checklist_id = ?').get(req.params.itemId, checklist.id);
   if (!item) {
     return renderError(res, 404, 'Task not found.');
   }
   db.prepare(
     "UPDATE checklist_items SET status = ?, completed_at = CASE WHEN ? = 'done' THEN datetime('now') ELSE NULL END WHERE id = ?"
   ).run(status, status, item.id);
+  logAudit(req, 'checklist', checklist.id, 'status_changed', `"${item.task_text}" marked ${CHECKLIST_ITEM_STATUS_LABELS[status]}`);
   res.redirect(`/people/${checklist.person_id}?flash=${encodeURIComponent('Task updated.')}`);
 });
 
@@ -1543,6 +1700,7 @@ app.post('/requests/:id/status', requireAdmin, (req, res) => {
     );
     for (const message of messages) {
       insertActivity.run(requestId, req.user.id, req.user.name, message.action, message.detail);
+      logAudit(req, 'request', requestId, message.action, message.detail);
     }
 
     return { changed: true };

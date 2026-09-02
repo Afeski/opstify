@@ -80,3 +80,16 @@ CREATE TRIGGER IF NOT EXISTS documents_au AFTER UPDATE ON documents BEGIN
   INSERT INTO documents_fts(documents_fts, rowid, title, content) VALUES ('delete', old.id, old.title, old.content);
   INSERT INTO documents_fts(rowid, title, content) VALUES (new.id, new.title, new.content);
 END;
+
+-- cited_document_ids is a JSON-encoded array (SQLite has no array type) —
+-- parsed back out on display, not queried into relationally, since
+-- nothing needs to filter by "which doc got cited" yet
+CREATE TABLE IF NOT EXISTS query_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id INTEGER REFERENCES users(id),
+  question TEXT NOT NULL,
+  answer TEXT NOT NULL,
+  cited_document_ids TEXT,
+  found_answer INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

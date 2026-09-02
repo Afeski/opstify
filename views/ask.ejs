@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <%- include('partials/flash', { flash }) %>
+    <div class="page-header">
+      <div>
+        <h1>Ask</h1>
+        <p class="muted">Answers are grounded in the document library, with citations back to the source</p>
+      </div>
+    </div>
+
+    <form method="POST" action="/ask" class="card document-form ai-suggest-form">
+      <label>
+        Your question
+        <textarea name="question" required rows="3" placeholder="e.g. How many PTO days do new hires get?"></textarea>
+      </label>
+      <button type="submit">&#10024; Ask</button>
+    </form>
+
+    <% if (answeredQuery) { %>
+      <div class="card">
+        <h2>&ldquo;<%= answeredQuery.question %>&rdquo;</h2>
+        <p class="preserve-whitespace<%= answeredQuery.foundAnswer ? '' : ' muted' %>"><%= answeredQuery.answer %></p>
+        <% if (answeredQuery.citedDocs.length > 0) { %>
+          <p class="muted">
+            Source<%= answeredQuery.citedDocs.length === 1 ? '' : 's' %>:
+            <% answeredQuery.citedDocs.forEach(function(d, i) { %>
+              <a href="/documents/<%= d.id %>"><%= d.title %></a><%= i < answeredQuery.citedDocs.length - 1 ? ', ' : '' %>
+            <% }); %>
+          </p>
+        <% } %>
+      </div>
+    <% } %>
+  </main>
+  </div>
+</body>
+</html>

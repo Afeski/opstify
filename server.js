@@ -172,12 +172,20 @@ function withBarPercentages(rows) {
 // characters like -, ", or * in what someone types as literal text rather
 // than query syntax — an unsanitized MATCH can throw a syntax error on an
 // ordinary-looking search (e.g. a name with a hyphen in it).
-function sanitizeFtsQuery(raw) {
+// join defaults to implicit AND (FTS5's default when quoted terms are
+// space-joined) — right for a deliberate short keyword search where every
+// term is expected to matter. Natural-language questions need 'OR'
+// instead: a question like "How many PTO days do employees get?" has to
+// match on "PTO"/"days"/"employees", but AND-ing in filler words like
+// "how"/"do"/"get" (which won't appear in the source text) returns
+// nothing even when a document is obviously relevant — found and fixed
+// this exact case while building /ask, not a hypothetical.
+function sanitizeFtsQuery(raw, join = ' ') {
   return raw
     .trim()
     .split(/\s+/)
     .map((term) => `"${term.replace(/"/g, '""')}"`)
-    .join(' ');
+    .join(join);
 }
 
 // SQLite's datetime('now') stores UTC as "YYYY-MM-DD HH:MM:SS" (no
@@ -335,6 +343,53 @@ async function getAiAssigneeSuggestion(description, admins) {
   }
 
   return { assigneeId: matchedAdmin.id, rationale: parsed.rationale.trim() };
+}
+
+// retrievedDocs: [{ id, title, content }] — exactly what FTS5 retrieval
+// found for this question, and the only source of truth the model is
+// given. citedDocumentIds coming back is filtered down to ids that were
+// actually in this set — a citation for anything else is dropped, not
+// trusted, same "never assume a hallucinated id is safe" rule as above.
+// This filtering is the real enforcement of "no hallucinated answers,"
+// not just an instruction in the prompt text.
+async function getAiAnswer(question, retrievedDocs) {
+  const docList = retrievedDocs
+    .map((d) => `--- Document id ${d.id}: "${d.title}" ---\n${d.content}`)
+    .join('\n\n');
+
+  const parsed = await callGeminiJson(
+    'You are answering a question for an internal team using only the documents ' +
+      'provided below. Answer strictly from their content — do not use outside ' +
+      "knowledge, and do not guess. If the documents don't actually answer the " +
+      'question, set foundAnswer to false and say so plainly in the answer field ' +
+      'rather than making something up. List the id of every document you ' +
+      'actually used to answer in citedDocumentIds.\n\n' +
+      `Documents:\n${docList}\n\n` +
+      `Question: ${question}`,
+    {
+      type: 'object',
+      properties: {
+        answer: { type: 'string' },
+        foundAnswer: { type: 'boolean' },
+        citedDocumentIds: { type: 'array', items: { type: 'integer' } },
+      },
+      required: ['answer', 'foundAnswer', 'citedDocumentIds'],
+    }
+  );
+
+  if (
+    typeof parsed.answer !== 'string' ||
+    !parsed.answer.trim() ||
+    typeof parsed.foundAnswer !== 'boolean' ||
+    !Array.isArray(parsed.citedDocumentIds)
+  ) {
+    throw new Error('Gemini API returned an unexpected shape.');
+  }
+
+  const retrievedIds = new Set(retrievedDocs.map((d) => d.id));
+  const citedDocumentIds = parsed.citedDocumentIds.filter((id) => retrievedIds.has(id));
+
+  return { answer: parsed.answer.trim(), foundAnswer: parsed.foundAnswer, citedDocumentIds };
 }
 
 const app = express();
@@ -991,6 +1046,136 @@ app.post('/documents/:id/delete', requireAdmin, (req, res) => {
   deleteDocAndVersions(document.id);
 
   res.redirect(`/documents?flash=${encodeURIComponent('Document deleted.')}`);
+});
+
+// all roles can ask — an SOP repository only helps if everyone can query
+// it, same reasoning as read access to /documents itself
+app.get('/ask', (req, res) => {
+  if (!req.session.userId) {
+    return res.redirect('/login');
+  }
+
+  let answeredQuery = null;
+  if (req.query.id) {
+    // only the asker sees their own past answer here — this route has no
+    // admin-sees-everything mode, that's what /ask/log is for
+    const row = db.prepare('SELECT * FROM query_log WHERE id = ? AND user_id = ?').get(req.query.id, req.user.id);
+    if (row) {
+      const citedIds = row.cited_document_ids ? JSON.parse(row.cited_document_ids) : [];
+      const citedDocs = citedIds.length
+        ? db
+            .prepare(`SELECT id, title FROM documents WHERE id IN (${citedIds.map(() => '?').join(',')})`)
+            .all(...citedIds)
+        : [];
+      answeredQuery = { ...row, foundAnswer: !!row.found_answer, citedDocs };
+    }
+  }
+
+  res.render('ask', {
+    title: 'Ask',
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    answeredQuery,
+    flash: req.query.flash || null,
+  });
+});
+
+app.post('/ask', async (req, res) => {
+  if (!req.session.userId) {
+    return res.redirect('/login');
+  }
+
+  const question = (req.body.question || '').trim();
+  if (!question) {
+    return renderError(res, 400, 'A question is required.');
+  }
+
+  try {
+    const retrievedDocs = db
+      .prepare(
+        `SELECT documents.id, documents.title, documents.content
+         FROM documents_fts
+         JOIN documents ON documents.id = documents_fts.rowid
+         WHERE documents_fts MATCH ?
+         ORDER BY rank
+         LIMIT 5`
+      )
+      .all(sanitizeFtsQuery(question, ' OR '));
+
+    let answer;
+    let foundAnswer;
+    let citedDocumentIds;
+
+    if (retrievedDocs.length === 0) {
+      // never call Gemini with nothing to ground an answer in — a hard
+      // guarantee against hallucination for the no-match case, not just
+      // an instruction hoping the model reports it accurately itself
+      answer = "I couldn't find any documents relevant to that question.";
+      foundAnswer = false;
+      citedDocumentIds = [];
+    } else {
+      const result = await getAiAnswer(question, retrievedDocs);
+      answer = result.answer;
+      foundAnswer = result.foundAnswer;
+      citedDocumentIds = result.citedDocumentIds;
+    }
+
+    const logResult = db
+      .prepare(
+        'INSERT INTO query_log (user_id, question, answer, cited_document_ids, found_answer) VALUES (?, ?, ?, ?, ?)'
+      )
+      .run(req.user.id, question, answer, JSON.stringify(citedDocumentIds), foundAnswer ? 1 : 0);
+
+    res.redirect(`/ask?id=${logResult.lastInsertRowid}`);
+  } catch (err) {
+    console.error('AI query failed:', err.message);
+    res.redirect(`/ask?flash=${encodeURIComponent("Couldn't get an answer right now.")}`);
+  }
+});
+
+app.get('/ask/log', requireAdmin, (req, res) => {
+  const rows = db
+    .prepare(
+      `SELECT query_log.*, users.name as asker_name
+       FROM query_log
+       LEFT JOIN users ON users.id = query_log.user_id
+       ORDER BY query_log.created_at DESC`
+    )
+    .all();
+
+  // resolve every cited document id to its title in one query rather than
+  // one lookup per row — admin's real interest here is verifying the
+  // answer actually used the right docs, so this needs to show titles,
+  // not just IDs
+  const allCitedIds = [
+    ...new Set(rows.flatMap((r) => (r.cited_document_ids ? JSON.parse(r.cited_document_ids) : []))),
+  ];
+  const titleById = allCitedIds.length
+    ? Object.fromEntries(
+        db
+          .prepare(`SELECT id, title FROM documents WHERE id IN (${allCitedIds.map(() => '?').join(',')})`)
+          .all(...allCitedIds)
+          .map((d) => [d.id, d.title])
+      )
+    : {};
+
+  const queries = rows.map((r) => ({
+    ...r,
+    foundAnswer: !!r.found_answer,
+    citedDocs: (r.cited_document_ids ? JSON.parse(r.cited_document_ids) : []).map((id) => ({
+      id,
+      title: titleById[id],
+    })),
+  }));
+
+  res.render('query-log', {
+    title: 'Query Log',
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    queries,
+  });
 });
 
 app.post('/requests/:id/ai-suggest-priority', requireAdmin, async (req, res) => {

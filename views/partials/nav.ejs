@@ -8,6 +8,7 @@
       <%= role === 'field_worker' ? 'My Profile' : 'Dashboard' %>
     </a>
     <a href="/documents" class="sidebar-link <%= currentPath.startsWith('/documents') ? 'active' : '' %>">Documents</a>
+    <a href="/ask" class="sidebar-link <%= currentPath === '/ask' ? 'active' : '' %>">Ask</a>
     <% if (role === 'employee') { %>
       <a href="/requests/new" class="sidebar-link <%= currentPath === '/requests/new' ? 'active' : '' %>">New request</a>
     <% } %>
@@ -16,6 +17,7 @@
     <% } %>
     <% if (role === 'admin') { %>
       <a href="/analytics" class="sidebar-link <%= currentPath === '/analytics' ? 'active' : '' %>">Analytics</a>
+      <a href="/ask/log" class="sidebar-link <%= currentPath === '/ask/log' ? 'active' : '' %>">Query Log</a>
     <% } %>
   </nav>
 

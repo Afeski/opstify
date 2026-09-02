@@ -148,20 +148,5 @@
     <% } %>
   </main>
   </div>
-
-  <script>
-    // The AI-suggest buttons trigger a real API call (a couple seconds of
-    // latency) before the full-page POST redirect lands, so without this
-    // the button just sits there looking unresponsive. This only needs to
-    // run client-side before navigation starts — no need to track when the
-    // request actually finishes.
-    document.querySelectorAll('.ai-suggest-form').forEach(function (form) {
-      form.addEventListener('submit', function () {
-        var button = form.querySelector('button');
-        button.disabled = true;
-        button.textContent = '⏳ Thinking…';
-      });
-    });
-  </script>
 </body>
 </html>

@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <div class="page-header">
+      <div>
+        <h1>Query Log</h1>
+        <p class="muted">Every question asked, whether the docs actually answered it, and what was cited</p>
+      </div>
+    </div>
+
+    <% if (queries.length === 0) { %>
+      <div class="empty-state">
+        <p>No questions asked yet.</p>
+      </div>
+    <% } else { %>
+      <ul class="activity-list">
+        <% queries.forEach(function(q) { %>
+          <li class="activity-item">
+            <p class="activity-detail">
+              <strong>&ldquo;<%= q.question %>&rdquo;</strong>
+              <span class="badge badge-<%= q.foundAnswer ? 'resolved' : 'open' %>"><%= q.foundAnswer ? 'Answered' : 'No answer found' %></span>
+            </p>
+            <p class="preserve-whitespace muted"><%= q.answer %></p>
+            <% if (q.citedDocs.length > 0) { %>
+              <p class="muted">
+                Cited:
+                <% q.citedDocs.forEach(function(d, i) { %>
+                  <a href="/documents/<%= d.id %>"><%= d.title %></a><%= i < q.citedDocs.length - 1 ? ', ' : '' %>
+                <% }); %>
+              </p>
+            <% } %>
+            <p class="activity-meta muted"><%= q.asker_name || 'Unknown' %> &middot; <%= q.created_at %></p>
+          </li>
+        <% }); %>
+      </ul>
+    <% } %>
+  </main>
+  </div>
+</body>
+</html>

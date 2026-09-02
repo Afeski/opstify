@@ -87,6 +87,19 @@
           }
         });
       });
+
+      // AI-backed forms (request suggestions, the /ask question box)
+      // trigger a real API call — a couple seconds of latency — before the
+      // full-page POST redirect lands, so without this the button just
+      // sits there looking unresponsive. Only needs to run client-side
+      // before navigation starts, not track when the request finishes.
+      document.querySelectorAll('.ai-suggest-form').forEach(function (form) {
+        form.addEventListener('submit', function () {
+          var button = form.querySelector('button');
+          button.disabled = true;
+          button.textContent = '⏳ Thinking…';
+        });
+      });
     });
   </script>
 </head>

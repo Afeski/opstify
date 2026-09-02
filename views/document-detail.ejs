@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <%- include('partials/flash', { flash }) %>
+    <p><a href="/documents">&larr; Back to documents</a></p>
+
+    <div class="page-header">
+      <div>
+        <h1><%= document.title %></h1>
+        <p class="muted"><%= document.category %> &middot; updated <%= document.updated_at %></p>
+      </div>
+      <% if (canEdit) { %>
+        <a href="/documents/<%= document.id %>/edit" class="button-link">Edit</a>
+      <% } %>
+    </div>
+
+    <div class="card">
+      <p class="preserve-whitespace"><%= document.content %></p>
+    </div>
+
+    <% if (versions.length > 0) { %>
+      <div class="card">
+        <h2>Version history</h2>
+        <ul class="activity-list">
+          <% versions.forEach(function(v) { %>
+            <li class="activity-item">
+              <p class="activity-detail"><a href="/documents/<%= document.id %>/versions/<%= v.id %>">Version from <%= v.created_at %></a></p>
+              <p class="activity-meta muted">Title at the time: <%= v.title %></p>
+            </li>
+          <% }); %>
+        </ul>
+      </div>
+    <% } %>
+
+    <% if (canEdit) { %>
+      <div class="card">
+        <h2>Danger zone</h2>
+        <form method="POST" action="/documents/<%= document.id %>/delete" data-confirm="Delete this document? This cannot be undone.">
+          <button type="submit" class="link-button">Delete this document</button>
+        </form>
+      </div>
+    <% } %>
+  </main>
+  </div>
+</body>
+</html>

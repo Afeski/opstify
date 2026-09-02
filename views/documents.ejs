@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <%- include('partials/flash', { flash }) %>
+    <div class="page-header">
+      <div>
+        <h1>Documents</h1>
+        <p class="muted">SOPs and reference material for the whole team</p>
+      </div>
+      <% if (canEdit) { %>
+        <a href="/documents/new" class="button-link">+ New document</a>
+      <% } %>
+    </div>
+
+    <form method="GET" action="/documents" class="filter-bar">
+      <div class="search-input">
+        <input type="text" name="q" placeholder="Search documents..." value="<%= q || '' %>">
+        <button type="submit">Search</button>
+      </div>
+      <div class="filter-controls">
+        <select name="category">
+          <option value="">All categories</option>
+          <% categories.forEach(function(c) { %>
+            <option value="<%= c %>" <%= category === c ? 'selected' : '' %>><%= c %></option>
+          <% }); %>
+        </select>
+        <% if (category || q) { %><a href="/documents">Clear</a><% } %>
+      </div>
+    </form>
+
+    <% if (documents.length === 0) { %>
+      <div class="empty-state">
+        <p><%= (q || category) ? 'No documents match.' : 'No documents yet.' %></p>
+      </div>
+    <% } else { %>
+      <div class="card table-card">
+        <table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Category</th>
+              <th>Updated</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <% documents.forEach(function(d) { %>
+              <tr>
+                <td><%= d.title %></td>
+                <td><%= d.category %></td>
+                <td class="muted"><%= d.updated_at %></td>
+                <td><a href="/documents/<%= d.id %>">View</a></td>
+              </tr>
+            <% }); %>
+          </tbody>
+        </table>
+      </div>
+    <% } %>
+  </main>
+  </div>
+</body>
+</html>

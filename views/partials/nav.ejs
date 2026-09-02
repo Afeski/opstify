@@ -7,6 +7,7 @@
     <a href="/dashboard" class="sidebar-link <%= currentPath === '/dashboard' ? 'active' : '' %>">
       <%= role === 'field_worker' ? 'My Profile' : 'Dashboard' %>
     </a>
+    <a href="/documents" class="sidebar-link <%= currentPath.startsWith('/documents') ? 'active' : '' %>">Documents</a>
     <% if (role === 'employee') { %>
       <a href="/requests/new" class="sidebar-link <%= currentPath === '/requests/new' ? 'active' : '' %>">New request</a>
     <% } %>

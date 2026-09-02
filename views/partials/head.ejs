@@ -75,6 +75,18 @@
           card.classList.add('is-visible');
         });
       }
+
+      // Any form can opt into a confirm-before-submit prompt by adding
+      // data-confirm="..." — used for destructive actions (deleting a
+      // document) rather than a framework-level modal/dialog component
+      // this app doesn't have.
+      document.querySelectorAll('form[data-confirm]').forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+          if (!window.confirm(form.dataset.confirm)) {
+            event.preventDefault();
+          }
+        });
+      });
     });
   </script>
 </head>

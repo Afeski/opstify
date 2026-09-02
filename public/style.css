@@ -1218,6 +1218,20 @@ a:hover {
   font-size: var(--text-base);
 }
 
+/* wider than .request-form — a 16-row content editor needs more room than
+   a two-field request form does */
+.document-form {
+  max-width: 720px;
+  gap: var(--space-2);
+}
+
+.document-form button {
+  margin-top: var(--space-1);
+  padding: 0.7rem var(--space-2);
+  font-size: var(--text-base);
+  align-self: flex-start;
+}
+
 .empty-state {
   background: var(--color-bg);
   border: 1px dashed var(--color-border);

@@ -168,6 +168,18 @@ function withBarPercentages(rows) {
   return rows.map((r) => ({ ...r, pct: Math.round((r.count / max) * 100) }));
 }
 
+// Wraps each whitespace-separated term in double quotes so FTS5 treats
+// characters like -, ", or * in what someone types as literal text rather
+// than query syntax — an unsanitized MATCH can throw a syntax error on an
+// ordinary-looking search (e.g. a name with a hyphen in it).
+function sanitizeFtsQuery(raw) {
+  return raw
+    .trim()
+    .split(/\s+/)
+    .map((term) => `"${term.replace(/"/g, '""')}"`)
+    .join(' ');
+}
+
 // SQLite's datetime('now') stores UTC as "YYYY-MM-DD HH:MM:SS" (no
 // timezone marker). Node's Date constructor treats a space-separated
 // string like that as *local* time, not UTC — replacing the space with
@@ -777,6 +789,208 @@ app.post('/certifications/:id/delete', requireAdmin, (req, res) => {
   db.prepare('DELETE FROM certifications WHERE id = ?').run(cert.id);
 
   res.redirect(`/people/${cert.user_id}?flash=${encodeURIComponent('Certification removed.')}`);
+});
+
+// all three roles can browse/search — an SOP repository only helps if
+// everyone can find answers in it; only admins can create/edit/delete
+// (enforced on the write routes below via requireAdmin)
+app.get('/documents', (req, res) => {
+  if (!req.session.userId) {
+    return res.redirect('/login');
+  }
+
+  // built from real data, not a hardcoded list, so category names are
+  // never baked into the code
+  const categories = db
+    .prepare('SELECT DISTINCT category FROM documents ORDER BY category')
+    .all()
+    .map((row) => row.category);
+  const category = categories.includes(req.query.category) ? req.query.category : '';
+  const q = (req.query.q || '').trim();
+
+  let documents;
+  if (q) {
+    const params = [sanitizeFtsQuery(q)];
+    let sql = `
+      SELECT documents.*
+      FROM documents_fts
+      JOIN documents ON documents.id = documents_fts.rowid
+      WHERE documents_fts MATCH ?
+    `;
+    if (category) {
+      sql += ' AND documents.category = ?';
+      params.push(category);
+    }
+    sql += ' ORDER BY rank';
+    documents = db.prepare(sql).all(...params);
+  } else {
+    let sql = 'SELECT * FROM documents';
+    const params = [];
+    if (category) {
+      sql += ' WHERE category = ?';
+      params.push(category);
+    }
+    sql += ' ORDER BY title';
+    documents = db.prepare(sql).all(...params);
+  }
+
+  res.render('documents', {
+    title: 'Documents',
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    documents,
+    categories,
+    category,
+    q,
+    canEdit: req.user.role === 'admin',
+    flash: req.query.flash || null,
+  });
+});
+
+app.get('/documents/new', requireAdmin, (req, res) => {
+  res.render('document-form', {
+    title: 'New Document',
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    document: null,
+    formAction: '/documents',
+  });
+});
+
+app.post('/documents', requireAdmin, (req, res) => {
+  const { title, category, content } = req.body;
+  if (!title || !title.trim() || !category || !category.trim() || !content || !content.trim()) {
+    return renderError(res, 400, 'Title, category, and content are required.');
+  }
+
+  const result = db
+    .prepare('INSERT INTO documents (title, category, content, created_by) VALUES (?, ?, ?, ?)')
+    .run(title.trim(), category.trim(), content.trim(), req.user.id);
+
+  res.redirect(`/documents/${result.lastInsertRowid}?flash=${encodeURIComponent('Document created.')}`);
+});
+
+app.get('/documents/:id', (req, res) => {
+  if (!req.session.userId) {
+    return res.redirect('/login');
+  }
+
+  const document = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+  if (!document) {
+    return renderError(res, 404, 'Document not found.');
+  }
+
+  const versions = db
+    .prepare('SELECT * FROM document_versions WHERE document_id = ? ORDER BY created_at DESC')
+    .all(document.id);
+
+  res.render('document-detail', {
+    title: document.title,
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    document,
+    versions,
+    canEdit: req.user.role === 'admin',
+    flash: req.query.flash || null,
+  });
+});
+
+app.get('/documents/:id/versions/:versionId', (req, res) => {
+  if (!req.session.userId) {
+    return res.redirect('/login');
+  }
+
+  const document = db.prepare('SELECT id, title FROM documents WHERE id = ?').get(req.params.id);
+  if (!document) {
+    return renderError(res, 404, 'Document not found.');
+  }
+
+  const version = db
+    .prepare('SELECT * FROM document_versions WHERE id = ? AND document_id = ?')
+    .get(req.params.versionId, document.id);
+  if (!version) {
+    return renderError(res, 404, 'Version not found.');
+  }
+
+  res.render('document-version', {
+    title: `${document.title} (previous version)`,
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    document,
+    version,
+  });
+});
+
+app.get('/documents/:id/edit', requireAdmin, (req, res) => {
+  const document = db.prepare('SELECT * FROM documents WHERE id = ?').get(req.params.id);
+  if (!document) {
+    return renderError(res, 404, 'Document not found.');
+  }
+
+  res.render('document-form', {
+    title: `Edit ${document.title}`,
+    name: req.user.name,
+    role: req.user.role,
+    currentPath: req.path,
+    document,
+    formAction: `/documents/${document.id}`,
+  });
+});
+
+app.post('/documents/:id', requireAdmin, (req, res) => {
+  const { title, category, content } = req.body;
+  if (!title || !title.trim() || !category || !category.trim() || !content || !content.trim()) {
+    return renderError(res, 400, 'Title, category, and content are required.');
+  }
+
+  // snapshot-then-overwrite, atomically: if anything here throws, the
+  // whole thing rolls back, so a document can never end up updated with
+  // no matching version snapshot of what it used to be
+  const updateAndSnapshot = db.transaction((docId) => {
+    const oldDoc = db.prepare('SELECT * FROM documents WHERE id = ?').get(docId);
+    if (!oldDoc) {
+      return { changed: false };
+    }
+
+    db.prepare(
+      'INSERT INTO document_versions (document_id, title, category, content, edited_by) VALUES (?, ?, ?, ?, ?)'
+    ).run(oldDoc.id, oldDoc.title, oldDoc.category, oldDoc.content, req.user.id);
+
+    db.prepare(
+      "UPDATE documents SET title = ?, category = ?, content = ?, updated_at = datetime('now') WHERE id = ?"
+    ).run(title.trim(), category.trim(), content.trim(), docId);
+
+    return { changed: true };
+  });
+
+  const result = updateAndSnapshot(req.params.id);
+  if (!result.changed) {
+    return renderError(res, 404, 'Document not found.');
+  }
+
+  res.redirect(`/documents/${req.params.id}?flash=${encodeURIComponent('Document updated.')}`);
+});
+
+app.post('/documents/:id/delete', requireAdmin, (req, res) => {
+  const document = db.prepare('SELECT id FROM documents WHERE id = ?').get(req.params.id);
+  if (!document) {
+    return renderError(res, 404, 'Document not found.');
+  }
+
+  // version rows reference the document, so they have to go first —
+  // foreign_keys enforcement (confirmed on elsewhere in this app) would
+  // otherwise block deleting a document that still has version history
+  const deleteDocAndVersions = db.transaction((docId) => {
+    db.prepare('DELETE FROM document_versions WHERE document_id = ?').run(docId);
+    db.prepare('DELETE FROM documents WHERE id = ?').run(docId);
+  });
+  deleteDocAndVersions(document.id);
+
+  res.redirect(`/documents?flash=${encodeURIComponent('Document deleted.')}`);
 });
 
 app.post('/requests/:id/ai-suggest-priority', requireAdmin, async (req, res) => {

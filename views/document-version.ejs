@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <p><a href="/documents/<%= document.id %>">&larr; Back to <%= document.title %></a></p>
+
+    <div class="page-header">
+      <div>
+        <h1><%= version.title %></h1>
+        <p class="muted">Version from <%= version.created_at %> &middot; <%= version.category %></p>
+      </div>
+    </div>
+
+    <div class="card">
+      <p class="preserve-whitespace"><%= version.content %></p>
+    </div>
+  </main>
+  </div>
+</body>
+</html>

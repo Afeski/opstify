@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<%- include('partials/head') %>
+<body>
+  <div class="app-shell">
+    <%- include('partials/nav', { name, role, currentPath }) %>
+  <main class="page">
+    <p><a href="<%= document ? '/documents/' + document.id : '/documents' %>">&larr; Back</a></p>
+
+    <div class="page-header">
+      <div>
+        <h1><%= document ? 'Edit document' : 'New document' %></h1>
+      </div>
+    </div>
+
+    <form method="POST" action="<%= formAction %>" class="card document-form">
+      <label>
+        Title
+        <input type="text" name="title" required value="<%= document ? document.title : '' %>">
+      </label>
+      <label>
+        Category
+        <input type="text" name="category" required value="<%= document ? document.category : '' %>" placeholder="e.g. Safety, HR, IT">
+      </label>
+      <label>
+        Content
+        <textarea name="content" required rows="16"><%= document ? document.content : '' %></textarea>
+      </label>
+      <button type="submit"><%= document ? 'Save changes' : 'Create document' %></button>
+    </form>
+  </main>
+  </div>
+</body>
+</html>
